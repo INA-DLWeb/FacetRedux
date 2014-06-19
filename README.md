@@ -1,13 +1,12 @@
-FacetRedux
-==========
+# FacetRedux
 
-**A proprioception tool for real-time big data exploration.**
+
+## A proprioception tool for real-time big data exploration.
 
 
 FacetRedux is a tool developed and used at [Ina's Web Legal Deposit](http://www.institut-national-audiovisuel.fr/collecte-depot-legal-web.html) for crawl metadata data-mining. This tool enables us to explore statistical indicators about our archive in real-time. We use it on a day-to-day basis to have an overview of the contents we archive, in order to tune our collection tools and methods.
 
-Propriocetion ?
---
+### Propriocetion ?
 
 Proprioception is a concept we borrowed to [cognitive science](http://en.wikipedia.org/wiki/Cognitive_science), where it refers to the intuitive perception we have of our own body. Proprioception explains how we are able to touch our nose without poking oursleves in the eyes : we constantly have an intuitive knowledge of the position our our and and nose.
 
@@ -16,8 +15,7 @@ This concept seemed relevent to us to describe our Web archive data-mining effor
  * "What is the average size of a Flash animation collected in 2013?"
  * "What is the number of distinct URLs collected in the `.fr` TLD in 2013?"
 
-Mining metadata
---
+### Mining metadata
 
 Our Web archive is stored in DAFF files (Digital Archive File Format). When we archive a document (image, web page, style sheetc, etc.) we create two different records that we store separately:
  * a **data** record (document itself, document's [SHA-256 signature](http://en.wikipedia.org/wiki/SHA-2))
@@ -36,8 +34,7 @@ Metadata records much lighter than data records since they do not store the cont
  * archiving session identifier (site id + session start date)
  * depth (in hyperlinks, relative to site home page)
 
-Responding to generic questions
---
+### Responding to generic questions
 
 With the information available in our metadata records, we have built a system that is able to answer a particular kind of generic question. To do so, we have extracted from the metadata what we call **criteria** and **features**.
 **Features** are numerical indicators that compute to answer a given request:
@@ -61,6 +58,37 @@ Using **criteria** and **features**, we are able to answer requests in the follo
 ```
     What is the value of FEATURE-x when CRITERIA-a = X and CRITERIA-b = Y and [...] ?
 ```
+
+### Real-time exploration
+
+Short response-times are essential in effective exploration. When diagnosing a problem or exploring a dataset, users tend to make amore general requests first, and then refine and/or change the request step by step. For example:
+> What is the biggest sites in the archive ?
+> `site X`
+>
+> For [site X], what type of content represents the biggest size ?
+> `content type Y`
+>
+> What is the average size of [content type Y] on [site X] ?
+> `700KB`
+>
+> What is the average size of [content type Y] accros the whole archive ?
+> `50KB`
+
+For this kind of back-and-forth conversation, short response-times help the user refine he's request and get an answer quickly.
+
+Considering the amount of records that are created every year in our archive (approximately *7 billion metadata records* in 2013), we cannot affort on-the-fly calculations to achieve reasonnable response-times. In early tests using [Apache Pig](http://pig.apache.org/), we experienced response-times averaging from several hours to several days. We quickly realized that for short response-times, you needed to **reduce** the amount of data on which you are doing requests, and also **pre-compute** features that you want to make available.
+
+
+### Strategy and Data model for pre-computed results
+
+#### first approach (TL;DR: not enough)
+
+A naive approach is to create for each metadata record an extaction (using Hadoop MapReduce) when the **keys** contains the *criteria* and the **value** contains the *features*. 
+
+| metadata record | map KEY | map VALUE |
+|-----------------|---------|-----------|
+| status:ok, url:http://foo.com/image1.jpg, date:2013-10-21T10:30:00Z, size:120k, sha256:`X`, type:image/jpg, depth:1, sessionId:foo@2013-10-20 | status:ok, month:2013-10, siteId:foo, sizeCateg:10k-150k, tld:com, depth:1, sha:`X` | records:1, size:120k |
+   
 
 
 
