@@ -83,26 +83,67 @@ Considering the amount of records that are created every year in our archive (ap
 
 The pre-computed backing data for our system is produced using the [Hadoop](http://hadoop.apache.org/) [MapReduce](http://en.wikipedia.org/wiki/MapReduce) framework. This framework enables us to scale to computation by distributing the tasks on multiples computers in a cluster.
 
-#### First approach (TL;DR: not working)
-
-A naive approach is to create an extaction for each metadata record (using Hadoop MapReduce), where the **key** contains the *criteria* and the **value** contains the *features*. Example of a Mapper output for this approach:
+Using MapReduce, we use the metadata as input to the Mapper to generate **two** output for each metadata record where the **key** contains a **prefix** (containing the *criteria*) and a **suffix** (containing the URL `MD5` for the first output _or_ the content `SHA256` in the second output). The **value** contains the content size.
 ```javascript
-  // 1) an HTML page
-  {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'HTML',  sizeCategory:'10k-150k', tld:"com", depth:0, sha256:'[X]'}, VALUE:{records:1, size:'73k'}}
-  // 2) the same image twice in the same month
-  {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1, sha256:'[Y]'}, VALUE:{records:1, size:'120k'}}
-  {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1, sha256:'[Y]'}, VALUE:{records:1, size:'120k'}}
-  // 3) another image (different content signature) with the same key.
-  {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1, sha256:'[Z]'}, VALUE:{records:1, size:'45k'}}
-  // 4) the same image as in 1), but one month later
-  {KEY:{status:'ok', month:'2013-11', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1, sha256:'[Y]'}, VALUE:{records:1, size:'120k'}}
+// Mapper output
+KEY: {
+  // criteria 
+  prefix: [ '[status]','[month]','[siteId]','[type]','[sizeCategory]','[tld]','[depth]' ],
+  // suffixType: 'URL MD5' or 'Content SHA256'
+  suffix: [ '[suffixType]', '[md5 or sha256]' ]
+}
+VALUE: [ '[size]' ]
 ```
 
-These 4 entries will be sorted by *key* and handed to the Reducer. Consecutive entries with the same *key* (except for the `sha256` content signature) will be merged and distinct content signatures counted. This would be the Reducder's output:
+The Reducer then sorts the records by *key prefix* and *key suffix*. The records with the same *key prefix* are grouped, the key suffix is used to count **distinct URLS**, **distinct contents** and compute the **deduplicated size** (cumulated size of unique contents). The Reducer generates _one input per unique key prefix_, the value of the output 
 ```javascript
-  {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'HTML',  sizeCategory:'10k-150k', tld:'com', depth:0}, VALUE:{records:1, size:'73k', deduplicatedSize:'73k', uniqueSHAs:1}}
-  {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1}, VALUE:{records:3, size:'120k + 120k + 45k', deduplicatedSize:'120k + 45k', uniqueSHAs:2}}
-  {KEY:{status:'ok', month:'2013-11', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1}, VALUE:{records:1, size:'120k', deduplicatedSize:'120k', uniqueSHAs:1}}
+// Reducer output
+KEY: [ '[status]','[month]','[siteId]','[type]','[sizeCategory]','[tld]','[depth]' ]
+VALUE: [ 'recordsCount', 'distinctURLs', 'distinctSHAs' 'cumulatedSize', 'deduplicatedSize' ]
+```
+
+
+#### First approach: enumerate criteria (TL;DR: not working)
+
+A naive approach is to create just *one* key prefix for each metadata record. The following example illustrates the ouput of the Mapper for this approach (for the sake of conciseness, URL MD5 key suffixes have been omitted):
+```javascript
+// 1) an HTML page
+{KEY:{
+  perfix:{status:'ok', month:'2013-10', siteId:'foo', type:'HTML',  sizeCategory:'10k-150k', tld:"com", depth:0},
+  suffix:{type:'sha256', sha256:'[X]'}
+}, VALUE:{size:'73k'}}
+// 2) the same image twice in the same month
+{KEY:{
+  prefix:{status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1},
+  suffix:{type:'sha256', sha256:'[Y]'}
+}, VALUE:{size:'120k'}}
+{KEY:
+  prefix:{status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1},
+  suffix:{type:'sha256', sha256:'[Y]'}
+}, VALUE:{size:'120k'}}
+// 3) another image (different content signature) with the same key.
+{KEY:
+  prefix:{status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1},
+  suffix:{type:'sha256', sha256:'[Z]'}
+}, VALUE:{size:'45k'}}
+// 4) the same image as in 1), but one month later
+{KEY:
+  prefix:{status:'ok', month:'2013-11', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1},
+  suffix:{type:'sha256', sha256:'[Y]'}
+}, VALUE:{size:'120k'}}
+```
+
+These 4 entries will be sorted and handed to the Reducer. Consecutive entries with the same *key prefix* will be merged and distinct content signatures counted. This would be the Reducer's output:
+```javascript
+{KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'HTML',  sizeCategory:'10k-150k', tld:'com', depth:0},
+ VALUE:{records:1, size:'73k', deduplicatedSize:'73k', uniqueSHAs:1, uniqueURLs:?}
+}
+{KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1},
+ VALUE:{records:3, size:'120k + 120k + 45k', deduplicatedSize:'120k + 45k', uniqueSHAs:2, uniqueURLs:?}
+}
+{KEY:{status:'ok', month:'2013-11', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1},
+ VALUE:{records:1, size:'120k', deduplicatedSize:'120k', uniqueSHAs:1, uniqueURLs:?}
+}
 ```
 
 With these results, to request the number of *records* for images on site `foo`, we simply need to sum the `records` field for all entries that match `siteId:'foo'` and `type:'IMAGE'`. This works because the `records` field is [associative](http://en.wikipedia.org/wiki/Associative_Property). On the other hand, if we want to count the number of distinct *content signatures* for the same criteria, we cannot simply sum the `uniqueSHAs` field for matching records. If we did so, we would get `4` instead of `3`, because the image with content signature `sha256:[Y]` would have been counted twice (once in for `month:'2013-10'` and once for `month:'2013-11'`).
@@ -128,19 +169,24 @@ The following array represents the 64 generated combinations, where the *criteri
 [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*]
 ```
 
-In pratice, the output of the mapper is similar to this:
+As a result, the Mapper's output has the same *key suffixes* and *values* as in the previous approach, but they are 64 times more output records, with **key prefixes** for each record similar to this:
 ```javascript
-{ status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:'1' }
-{ status:'ok', month:'*'      , siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:'1' }
-{ status:'ok', month:'2013-10', siteId:'*'  , type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:'1' }
-{ status:'ok', month:'*'      , siteId:'*'  , type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:'1' }
-{ status:'ok', month:'2013-10', siteId:'foo', type:'*'    , sizeCategory:'10k-150k', tld:'com', depth:'1' }
+{status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:'1'}
+{status:'ok', month:'*'      , siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:'1'}
+{status:'ok', month:'2013-10', siteId:'*'  , type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:'1'}
+{status:'ok', month:'*'      , siteId:'*'  , type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:'1'}
+{status:'ok', month:'2013-10', siteId:'foo', type:'*'    , sizeCategory:'10k-150k', tld:'com', depth:'1'}
 [...]
-{ status:'ok', month:'2013-10', siteId:'foo', type:'*'    , sizeCategory:'*'       , tld:'*'  , depth:'*' }
-{ status:'ok', month:'*'      , siteId:'foo', type:'*'    , sizeCategory:'*'       , tld:'*'  , depth:'*' }
-{ status:'ok', month:'2013-10', siteId:'*'  , type:'*'    , sizeCategory:'*'       , tld:'*'  , depth:'*' }
-{ status:'ok', month:'*'      , siteId:'*'  , type:'*'    , sizeCategory:'*'       , tld:'*'  , depth:'*' }
+{status:'ok', month:'2013-10', siteId:'foo', type:'*'    , sizeCategory:'*'       , tld:'*'  , depth:'*'}
+{status:'ok', month:'*'      , siteId:'foo', type:'*'    , sizeCategory:'*'       , tld:'*'  , depth:'*'}
+{status:'ok', month:'2013-10', siteId:'*'  , type:'*'    , sizeCategory:'*'       , tld:'*'  , depth:'*'}
+{status:'ok', month:'*'      , siteId:'*'  , type:'*'    , sizeCategory:'*'       , tld:'*'  , depth:'*'}
 ```
+
+
+
+
+
 
 # [...]
 
