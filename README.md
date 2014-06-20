@@ -95,7 +95,7 @@ KEY: {
 VALUE: [ '[size]' ]
 ```
 
-The Reducer sorts the records by *key prefix* and *key suffix*. The records with the same *key prefix* are grouped, the key suffix is used to count **unique URLS**, **unique contents** and compute the **deduplicated size** (cumulated size of unique contents). The Reducer generates _one input per unique key prefix_, the value of the output 
+The Reducer sorts the records by *key prefix* and *key suffix*. The records with the same *key prefix* are grouped, the key suffix is used to count **unique URLS** (using URL [MD5](http://en.wikipedia.org/wiki/MD5) signatures), **unique contents** (using content SHA256 signatures) and compute the **deduplicated size** (summing the size of unique contents). The Reducer generates _one input per unique key prefix_, the value of the output 
 ```javascript
 // Reducer output
 KEY: [ '[status]','[month]','[siteId]','[type]','[sizeCategory]','[tld]','[depth]' ]
