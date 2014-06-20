@@ -8,7 +8,7 @@ FacetRedux is a tool developed and used at [Ina's Web Legal Deposit](http://www.
 
 ### Propriocetion ?
 
-Proprioception is a concept we borrowed to [cognitive science](http://en.wikipedia.org/wiki/Cognitive_science), where it refers to the intuitive perception we have of our own body. Proprioception explains how we are able to touch our nose without poking oursleves in the eyes : we constantly have an intuitive knowledge of the position our our and and nose.
+Proprioception is a concept we borrowed to [cognitive science](http://en.wikipedia.org/wiki/Cognitive_science), where it refers to the [intuitive perception we have of our own body](http://en.wikipedia.org/wiki/Proprioception). Proprioception explains how we are able to touch our nose without poking oursleves in the eyes : we constantly have an intuitive knowledge of the position our our and and nose.
 
 This concept seemed relevent to us to describe our Web archive data-mining effort. As a matter of fact, one of the major challenges for a Web archive is to provide an analytical overview. On one hand, it is easy to request one of the billion documents from our archive, on the other hand, getting and answer to the following types of questions is more difficult:
  * "How did the number of distinct images collected on arte.tv evolve from April 2012 to April 2013?"
@@ -63,23 +63,25 @@ Using **criteria** and **features**, we are able to answer requests in the follo
 
 Short response-times are essential in effective exploration. When diagnosing a problem or exploring a dataset, users tend to make amore general requests first, and then refine and/or change the request step by step. For example:
 > What is the biggest sites in the archive ?
-> `site X`
+> : `site X`
 >
-> For [site X], what type of content represents the biggest size ?
-> `content type Y`
+> For `site X`, what type of content represents the biggest size ?
+> : `content type Y`
 >
-> What is the average size of [content type Y] on [site X] ?
-> `700KB`
+> What is the average size of `content type Y` on `site X` ?
+> : `700KB`
 >
-> What is the average size of [content type Y] accros the whole archive ?
-> `50KB`
+> What is the average size of `content type Y` accros the whole archive ?
+> : `50KB`
 
-For this kind of back-and-forth conversation, short response-times help the user refine he's request and get an answer quickly.
+For this kind of back-and-forth conversation, short response-times help the user refine his request progressively while staying focused on the question rather than the underlying technicalities.
 
-Considering the amount of records that are created every year in our archive (approximately *7 billion metadata records* in 2013), we cannot affort on-the-fly calculations to achieve reasonnable response-times. In early tests using [Apache Pig](http://pig.apache.org/), we experienced response-times averaging from several hours to several days. We quickly realized that for short response-times, you needed to **reduce** the amount of data on which you are doing requests, and also **pre-compute** features that you want to make available.
+Considering the amount of records that are created every year in our archive (approximately *7 billion metadata records* in 2013), we cannot afford on-the-fly calculations to achieve reasonnable response-times. In early tests using [Apache Pig](http://pig.apache.org/), we experienced response-times averaging from several hours to several days. We quickly realized that for short response-times, we needed to **reduce** the amount of data on which we do requests, and also **pre-compute** features that we make available.
 
 
-### Strategy and Data model for pre-computed results
+### MapReduce strategy for pre-computed results
+
+The pre-computed backing data for our system is produced using the [Hadoop](http://hadoop.apache.org/) [MapReduce](http://en.wikipedia.org/wiki/MapReduce) framework. This framework enables us to scale to computation by distributing the tasks on multiples computers in a cluster.
 
 #### First approach (TL;DR: not working)
 
@@ -108,9 +110,37 @@ With these results, to request the number of *records* for images on site `foo`,
 
 #### Actual approach: enumerate all criteria combinations
 
-In this approach, we will enumerate all possible combinaisons of *criteria* that can be made for an entry and pre-compute the values of the *features* for each combination. To continue with the previous example, to correctly compute the value of the `uniqueSHAs` field, we would have needed to precompute a result with the following key:
+In this approach, we enumerate all possible combinaisons of *criteria* that can be made for an entry and pre-compute the values of the *features* for each combination. Following the previous example, to correctly compute the value of the `uniqueSHAs` field, we would have needed to precompute a result with the following key:
 ```javascript
   {KEY:{status:'ANY', month:'ANY', siteId:'foo', type:'IMAGE', sizeCategory:'ANY', tld:'ANY', depth:'ANY'}
 ```
 
+To be able to compute such a result, the Mapper and Reducer need to be redesigned. Specifically, for each result in the previously described Mapper, we will generate **all** possible combinations of *criteria* in the key where a criteria matches any value (i.e. `ANY`). 
+To enumerate these [combinations with our 7 criteria](http://rosettacode.org/wiki/Combinations#Java), we generate what is called a [*C(n, k) for all k where `n=7`*](http://en.wikipedia.org/wiki/Combination#Number_of_k-combinations_for_all_k). To limit the number of possible combinations and improve scalability, we have decided to exclude the first *criteria* (`response status`) from the combinations. Thus, for each metadata entry, the Mapper will generate the *C(6, k) for all k* key combinations (64 combinations) of all *criteria*.
+The following array represents the 64 generated combinations, where the *criteria* are replaced by `*` when they can match any value.
+```
+01  02  03  04  05  06  07  08  09  10  11  12  13  14  15  16  17  18  19  20  21  22  23  24  25  26  27  28  29  30  31  32  33  34  35  36  37  38  39  40  41  42  43  44  45  46  47  48  49  50  51  52  53  54  55  56  57  58  59  60  61  62  63  64  
+[1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] 
+[2] [2] [*] [*] [2] [2] [*] [*] [2] [2] [*] [*] [2] [2] [*] [*] [2] [2] [*] [*] [2] [2] [*] [*] [2] [2] [*] [*] [2] [2] [*] [*] [2] [2] [*] [*] [2] [2] [*] [*] [2] [2] [*] [*] [2] [2] [*] [*] [2] [2] [*] [*] [2] [2] [*] [*] [2] [2] [*] [*] [2] [2] [*] [*] 
+[3] [3] [3] [3] [*] [*] [*] [*] [3] [3] [3] [3] [*] [*] [*] [*] [3] [3] [3] [3] [*] [*] [*] [*] [3] [3] [3] [3] [*] [*] [*] [*] [3] [3] [3] [3] [*] [*] [*] [*] [3] [3] [3] [3] [*] [*] [*] [*] [3] [3] [3] [3] [*] [*] [*] [*] [3] [3] [3] [3] [*] [*] [*] [*] 
+[4] [4] [4] [4] [4] [4] [4] [4] [*] [*] [*] [*] [*] [*] [*] [*] [4] [4] [4] [4] [4] [4] [4] [4] [*] [*] [*] [*] [*] [*] [*] [*] [4] [4] [4] [4] [4] [4] [4] [4] [*] [*] [*] [*] [*] [*] [*] [*] [4] [4] [4] [4] [4] [4] [4] [4] [*] [*] [*] [*] [*] [*] [*] [*] 
+[5] [5] [5] [5] [5] [5] [5] [5] [5] [5] [5] [5] [5] [5] [5] [5] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [5] [5] [5] [5] [5] [5] [5] [5] [5] [5] [5] [5] [5] [5] [5] [5] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] 
+[6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*]
+```
+
+In pratice, the output of the mapper is similar to this:
+```javascript
+{ status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:'1' }
+{ status:'ok', month:'*'      , siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:'1' }
+{ status:'ok', month:'2013-10', siteId:'*'  , type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:'1' }
+{ status:'ok', month:'*'      , siteId:'*'  , type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:'1' }
+{ status:'ok', month:'2013-10', siteId:'foo', type:'*'    , sizeCategory:'10k-150k', tld:'com', depth:'1' }
+[...]
+{ status:'ok', month:'2013-10', siteId:'foo', type:'*'    , sizeCategory:'*'       , tld:'*'  , depth:'*' }
+{ status:'ok', month:'*'      , siteId:'foo', type:'*'    , sizeCategory:'*'       , tld:'*'  , depth:'*' }
+{ status:'ok', month:'2013-10', siteId:'*'  , type:'*'    , sizeCategory:'*'       , tld:'*'  , depth:'*' }
+{ status:'ok', month:'*'      , siteId:'*'  , type:'*'    , sizeCategory:'*'       , tld:'*'  , depth:'*' }
+```
+
+# [...]
 
