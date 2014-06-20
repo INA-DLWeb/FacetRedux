@@ -81,14 +81,27 @@ Considering the amount of records that are created every year in our archive (ap
 
 ### Strategy and Data model for pre-computed results
 
-#### first approach (TL;DR: not enough)
+#### First approach (TL;DR: not enough)
 
-A naive approach is to create for each metadata record an extaction (using Hadoop MapReduce) when the **keys** contains the *criteria* and the **value** contains the *features*. 
+A naive approach is to create an extaction for each metadata record (using Hadoop MapReduce), where the **key** contains the *criteria* and the **value** contains the *features*. Example of a Mapper output for this approach:
+```javascript
+  // 1) an HTML page
+  {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'HTML',  sizeCategory:'10k-150k', tld:"com", depth:0, sha256:'[X]'}, VALUE:{records:1, size:'73k'}}
+  // 2) the same image twice in the same month
+  {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1, sha256:'[Y]'}, VALUE:{records:1, size:'120k'}}
+  {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1, sha256:'[Y]'}, VALUE:{records:1, size:'120k'}}
+  // 3) another image (different content signature) with the same key.
+  {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1, sha256:'[Z]'}, VALUE:{records:1, size:'45k'}}
+  // 4) the same image as in 1), but one month later
+  {KEY:{status:'ok', month:'2013-11', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1, sha256:'[Y]'}, VALUE:{records:1, size:'120k'}}
+```
 
-| metadata record | map KEY | map VALUE |
-|-----------------|---------|-----------|
-| status:ok, url:http://foo.com/image1.jpg, date:2013-10-21T10:30:00Z, size:120k, sha256:`X`, type:image/jpg, depth:1, sessionId:foo@2013-10-20 | status:ok, month:2013-10, siteId:foo, sizeCateg:10k-150k, tld:com, depth:1, sha:`X` | records:1, size:120k |
-   
+These 4 entries will be sorted by *key* and handed to the Reducer. Consecutive entries with the same *key* (except for the `sha256` content signature) will be merged and distinct content signatures counted. This would be the Reducder's output:
+```javascript
+  {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'HTML',  sizeCategory:'10k-150k', tld:'com', depth:0}, VALUE:{records:1, size:'73k', deduplicatedSize:'73k', shas:1}}
+  {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1}, VALUE:{records:3, size:'120k + 120k + 45k', deduplicatedSize:'120k + 45k', shas:2}}
+  {KEY:{status:'ok', month:'2013-11', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1}, VALUE:{records:1, size:'120k', deduplicatedSize:'120k', shas:1}}
+```
 
 
 
