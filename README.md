@@ -11,9 +11,9 @@ FacetRedux is a tool developed and used at [Ina's Web Legal Deposit](http://www.
 Proprioception is a concept we borrowed to [cognitive science](http://en.wikipedia.org/wiki/Cognitive_science), where it refers to the [intuitive perception we have of our own body](http://en.wikipedia.org/wiki/Proprioception). Proprioception explains how we are able to touch our nose without poking oursleves in the eyes : we constantly have an intuitive knowledge of the position our our and and nose.
 
 This concept seemed relevent to us to describe our Web archive data-mining effort. As a matter of fact, one of the major challenges for a Web archive is to provide an analytical overview. On one hand, it is easy to request one of the billion documents from our archive, on the other hand, getting and answer to the following types of questions is more difficult:
- * "How did the number of distinct images collected on arte.tv evolve from April 2012 to April 2013?"
+ * "How did the number of unique images collected on arte.tv evolve from April 2012 to April 2013?"
  * "What is the average size of a Flash animation collected in 2013?"
- * "What is the number of distinct URLs collected in the `.fr` TLD in 2013?"
+ * "What is the number of unique URLs collected in the `.fr` TLD in 2013?"
 
 ### Mining metadata
 
@@ -81,9 +81,9 @@ Considering the amount of records that are created every year in our archive (ap
 
 ### MapReduce strategy for pre-computed results
 
-The pre-computed backing data for our system is produced using the [Hadoop](http://hadoop.apache.org/) [MapReduce](http://en.wikipedia.org/wiki/MapReduce) framework. This framework enables us to scale to computation by distributing the tasks on multiples computers in a cluster.
+The pre-computed backing data for our system is produced using the [Hadoop](http://hadoop.apache.org/) [MapReduce](http://en.wikipedia.org/wiki/MapReduce) framework. This framework enables us to scale the pre-computing process by splitting it into multiple small tasks and distributing these tasks across computers in a cluster.
 
-Using MapReduce, we use the metadata as input to the Mapper to generate **two** output for each metadata record where the **key** contains a **prefix** (containing the *criteria*) and a **suffix** (containing the URL `MD5` for the first output _or_ the content `SHA256` in the second output). The **value** contains the content size.
+Using MapReduce, we use the metadata as input to the Mapper to generate _two_ outputs for each metadata record. The ouput **key** contains a **prefix** (the *criteria* for the record) and a **suffix** (containing the _URL `MD5` in the first output_ or _the content `SHA256` in the second output_). The **value** contains the content size.
 ```javascript
 // Mapper output
 KEY: {
@@ -95,11 +95,11 @@ KEY: {
 VALUE: [ '[size]' ]
 ```
 
-The Reducer then sorts the records by *key prefix* and *key suffix*. The records with the same *key prefix* are grouped, the key suffix is used to count **distinct URLS**, **distinct contents** and compute the **deduplicated size** (cumulated size of unique contents). The Reducer generates _one input per unique key prefix_, the value of the output 
+The Reducer sorts the records by *key prefix* and *key suffix*. The records with the same *key prefix* are grouped, the key suffix is used to count **unique URLS**, **unique contents** and compute the **deduplicated size** (cumulated size of unique contents). The Reducer generates _one input per unique key prefix_, the value of the output 
 ```javascript
 // Reducer output
 KEY: [ '[status]','[month]','[siteId]','[type]','[sizeCategory]','[tld]','[depth]' ]
-VALUE: [ 'recordsCount', 'distinctURLs', 'distinctSHAs' 'cumulatedSize', 'deduplicatedSize' ]
+VALUE: [ 'recordsCount', 'uniqueURLs', 'uniqueSHAs' 'cumulatedSize', 'deduplicatedSize' ]
 ```
 
 
@@ -109,7 +109,7 @@ A naive approach is to create just *one* key prefix for each metadata record. Th
 ```javascript
 // 1) an HTML page
 {KEY:{
-  perfix:{status:'ok', month:'2013-10', siteId:'foo', type:'HTML',  sizeCategory:'10k-150k', tld:"com", depth:0},
+  prefix:{status:'ok', month:'2013-10', siteId:'foo', type:'HTML',  sizeCategory:'10k-150k', tld:"com", depth:0},
   suffix:{type:'sha256', sha256:'[X]'}
 }, VALUE:{size:'73k'}}
 // 2) the same image twice in the same month
@@ -133,7 +133,7 @@ A naive approach is to create just *one* key prefix for each metadata record. Th
 }, VALUE:{size:'120k'}}
 ```
 
-These 4 entries will be sorted and handed to the Reducer. Consecutive entries with the same *key prefix* will be merged and distinct content signatures counted. This would be the Reducer's output:
+These 4 entries will be sorted and handed to the Reducer. Consecutive entries with the same *key prefix* will be merged and unique content signatures counted. This would be the Reducer's output:
 ```javascript
 {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'HTML',  sizeCategory:'10k-150k', tld:'com', depth:0},
  VALUE:{records:1, size:'73k', deduplicatedSize:'73k', uniqueSHAs:1, uniqueURLs:?}
@@ -146,7 +146,7 @@ These 4 entries will be sorted and handed to the Reducer. Consecutive entries wi
 }
 ```
 
-With these results, to request the number of *records* for images on site `foo`, we simply need to sum the `records` field for all entries that match `siteId:'foo'` and `type:'IMAGE'`. This works because the `records` field is [associative](http://en.wikipedia.org/wiki/Associative_Property). On the other hand, if we want to count the number of distinct *content signatures* for the same criteria, we cannot simply sum the `uniqueSHAs` field for matching records. If we did so, we would get `4` instead of `3`, because the image with content signature `sha256:[Y]` would have been counted twice (once in for `month:'2013-10'` and once for `month:'2013-11'`).
+With these results, to request the number of *records* for images on site `foo`, we simply need to sum the `records` field for all entries that match `siteId:'foo'` and `type:'IMAGE'`. This works because the `records` field is [associative](http://en.wikipedia.org/wiki/Associative_Property). On the other hand, if we want to count the number of unique *content signatures* for the same criteria, we cannot simply sum the `uniqueSHAs` field for matching records. If we did so, we would get `4` instead of `3`, because the image with content signature `sha256:[Y]` would have been counted twice (once in for `month:'2013-10'` and once for `month:'2013-11'`).
 
 
 #### Actual approach: enumerate all criteria combinations
@@ -156,9 +156,9 @@ In this approach, we enumerate all possible combinaisons of *criteria* that can 
   {KEY:{status:'ANY', month:'ANY', siteId:'foo', type:'IMAGE', sizeCategory:'ANY', tld:'ANY', depth:'ANY'}
 ```
 
-To be able to compute such a result, the Mapper and Reducer need to be redesigned. Specifically, for each result in the previously described Mapper, we will generate **all** possible combinations of *criteria* in the key where a criteria matches any value (i.e. `ANY`). 
+To be able to compute such a result, the Mapper and Reducer need to be redesigned. Specifically, for each ouput in the previously described Mapper, we will generate **all** possible combinations of *criteria* in the key prefix _where a criteria matches any value_ (i.e. `ANY`). 
 To enumerate these [combinations with our 7 criteria](http://rosettacode.org/wiki/Combinations#Java), we generate what is called a [*C(n, k) for all k where `n=7`*](http://en.wikipedia.org/wiki/Combination#Number_of_k-combinations_for_all_k). To limit the number of possible combinations and improve scalability, we have decided to exclude the first *criteria* (`response status`) from the combinations. Thus, for each metadata entry, the Mapper will generate the *C(6, k) for all k* key combinations (64 combinations) of all *criteria*.
-The following array represents the 64 generated combinations, where the *criteria* are replaced by `*` when they can match any value.
+The following array represents the 64 generated combinations, where a *criteria* is replaced by `*` when it can match any value.
 ```
 01  02  03  04  05  06  07  08  09  10  11  12  13  14  15  16  17  18  19  20  21  22  23  24  25  26  27  28  29  30  31  32  33  34  35  36  37  38  39  40  41  42  43  44  45  46  47  48  49  50  51  52  53  54  55  56  57  58  59  60  61  62  63  64  
 [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] [1] [*] 
@@ -169,7 +169,7 @@ The following array represents the 64 generated combinations, where the *criteri
 [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [6] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*] [*]
 ```
 
-As a result, the Mapper's output has the same *key suffixes* and *values* as in the previous approach, but they are 64 times more output records, with **key prefixes** for each record similar to this:
+As a result, the Mapper's output has the same *key suffixes* and *values* as in the previous approach, but there are 64 times more output records because of the different combinations of **key prefixes** generated for each record:
 ```javascript
 {status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:'1'}
 {status:'ok', month:'*'      , siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:'1'}
