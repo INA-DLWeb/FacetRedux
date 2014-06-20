@@ -81,7 +81,7 @@ Considering the amount of records that are created every year in our archive (ap
 
 ### Strategy and Data model for pre-computed results
 
-#### First approach (TL;DR: not enough)
+#### First approach (TL;DR: not working)
 
 A naive approach is to create an extaction for each metadata record (using Hadoop MapReduce), where the **key** contains the *criteria* and the **value** contains the *features*. Example of a Mapper output for this approach:
 ```javascript
@@ -98,11 +98,19 @@ A naive approach is to create an extaction for each metadata record (using Hadoo
 
 These 4 entries will be sorted by *key* and handed to the Reducer. Consecutive entries with the same *key* (except for the `sha256` content signature) will be merged and distinct content signatures counted. This would be the Reducder's output:
 ```javascript
-  {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'HTML',  sizeCategory:'10k-150k', tld:'com', depth:0}, VALUE:{records:1, size:'73k', deduplicatedSize:'73k', shas:1}}
-  {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1}, VALUE:{records:3, size:'120k + 120k + 45k', deduplicatedSize:'120k + 45k', shas:2}}
-  {KEY:{status:'ok', month:'2013-11', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1}, VALUE:{records:1, size:'120k', deduplicatedSize:'120k', shas:1}}
+  {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'HTML',  sizeCategory:'10k-150k', tld:'com', depth:0}, VALUE:{records:1, size:'73k', deduplicatedSize:'73k', uniqueSHAs:1}}
+  {KEY:{status:'ok', month:'2013-10', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1}, VALUE:{records:3, size:'120k + 120k + 45k', deduplicatedSize:'120k + 45k', uniqueSHAs:2}}
+  {KEY:{status:'ok', month:'2013-11', siteId:'foo', type:'IMAGE', sizeCategory:'10k-150k', tld:'com', depth:1}, VALUE:{records:1, size:'120k', deduplicatedSize:'120k', uniqueSHAs:1}}
 ```
 
+With these results, to request the number of *records* for images on site `foo`, we simply need to sum the `records` field for all entries that match `siteId:'foo'` and `type:'IMAGE'`. This works because the `records` field is [associative](http://en.wikipedia.org/wiki/Associative_Property). On the other hand, if we want to count the number of distinct *content signatures* for the same criteria, we cannot simply sum the `uniqueSHAs` field for matching records. If we did so, we would get `4` instead of `3`, because the image with content signature `sha256:[Y]` would have been counted twice (once in for `month:'2013-10'` and once for `month:'2013-11'`).
 
+
+#### Actual approach: enumerate all criteria combinations
+
+In this approach, we will enumerate all possible combinaisons of *criteria* that can be made for an entry and pre-compute the values of the *features* for each combination. To continue with the previous example, to correctly compute the value of the `uniqueSHAs` field, we would have needed to precompute a result with the following key:
+```javascript
+  {KEY:{status:'ANY', month:'ANY', siteId:'foo', type:'IMAGE', sizeCategory:'ANY', tld:'ANY', depth:'ANY'}
+```
 
 
