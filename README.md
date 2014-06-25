@@ -1,3 +1,11 @@
+
+Code Index:
+ * FacetRedux [mapper](./src/main/java/fr/ina/dlweb/proprioception/facetRedux/job/FacetReduxMapper.java#L71)
+ * FacetRedux [reducer](./src/main/java/fr/ina/dlweb/proprioception/facetRedux/job/FacetReduxReducer.java#L71)
+ * FacetRedux key combinations generation ([here](http://rosettacode.org/wiki/Combinations#Java), [here](./src/main/java/fr/ina/dlweb/proprioception/facetRedux/job/FacetReduxJob.java#L117) and [here](./src/main/java/fr/ina/dlweb/proprioception/facetRedux/job/FacetReduxMapper.java#L170))
+ * FacetRedux [CSV charts](./src/main/resources/fr/ina/dlweb/proprioception/csvChart)
+
+
 # FacetRedux
 
 
@@ -6,14 +14,16 @@
 
 FacetRedux is a tool developed and used at [Ina's Web Legal Deposit](http://www.institut-national-audiovisuel.fr/collecte-depot-legal-web.html) for crawl metadata data-mining. This tool enables us to explore statistical indicators about our archive in real-time. We use it on a day-to-day basis to have an overview of the contents we archive, in order to tune our collection tools and methods.
 
-### Propriocetion ?
+### Proprioception ?
 
-Proprioception is a concept we borrowed to [cognitive science](http://en.wikipedia.org/wiki/Cognitive_science), where it refers to the [intuitive perception we have of our own body](http://en.wikipedia.org/wiki/Proprioception). Proprioception explains how we are able to touch our nose without poking oursleves in the eyes : we constantly have an intuitive knowledge of the position our our and and nose.
+Proprioception is a concept we borrowed to [cognitive science](http://en.wikipedia.org/wiki/Cognitive_science), where it refers to the [intuitive perception we have of our own body](http://en.wikipedia.org/wiki/Proprioception). Proprioception explains how people are able to touch their own nose without poking themselves in the eyes : they constantly have an intuitive knowledge of the position their hand and nose.
 
-This concept seemed relevent to us to describe our Web archive data-mining effort. As a matter of fact, one of the major challenges for a Web archive is to provide an analytical overview. On one hand, it is easy to request one of the billion documents from our archive, on the other hand, getting and answer to the following types of questions is more difficult:
+This concept seemed relevent to us to describe our Web archive data-mining effort. As a matter of fact, one of the major challenges for a Web archive is to provide an analytical overview. On one hand, it is easy to request one of the billions of documents from our archive in a couple of milliseconds; on the other hand, getting and answer to the following types of questions in less than a couple of hours is more difficult:
  * "How did the number of unique images collected on arte.tv evolve from April 2012 to April 2013?"
  * "What is the average size of a Flash animation collected in 2013?"
  * "What is the number of unique URLs collected in the `.fr` TLD in 2013?"
+
+This is due to the fact that a lot of information has to be processed to generate answers these types of questions.
 
 ### Mining metadata
 
@@ -27,7 +37,7 @@ Metadata records much lighter than data records since they do not store the cont
  * response status (`ok`, `redirection`, `error`, etc.)
  * URL
  * date
- * SHA-256 signature
+ * SHA-256 content signature
  * MIME content-type (as found in the HTTP response headers)
  * client User-Agent (as found in the HTTP request headers)
  * size in bytes
@@ -95,7 +105,7 @@ KEY: {
 VALUE: [ '[size]' ]
 ```
 
-The [Reducer](./src/main/java/fr/ina/dlweb/proprioception/facetRedux/job/FacetReduxReducer.java#L71) sorts the records by *key prefix* and *key suffix*. The records with the same *key prefix* are grouped, the key suffix is used to count **unique URLS** (using URL [MD5](http://en.wikipedia.org/wiki/MD5) signatures), **unique contents** (using content SHA256 signatures) and compute the **deduplicated size** (summing the size of unique contents). The Reducer generates _one input per unique key prefix_, the value of the output 
+The [Reducer](./src/main/java/fr/ina/dlweb/proprioception/facetRedux/job/FacetReduxReducer.java#L71) sorts the records by *key prefix* and *key suffix*. The records with the same *key prefix* are grouped, the key suffix is used to count **unique URLS** (using [MD5](http://en.wikipedia.org/wiki/MD5) URL signatures), **unique contents** (using SHA256 content signatures) and compute the **deduplicated size** (summing the size of unique contents). The Reducer generates _one input per unique key prefix_, the value of the output 
 ```javascript
 // Reducer output
 KEY: [ '[status]','[month]','[siteId]','[type]','[sizeCategory]','[tld]','[depth]' ]
