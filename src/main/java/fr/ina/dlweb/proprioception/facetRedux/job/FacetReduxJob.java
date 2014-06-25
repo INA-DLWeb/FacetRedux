@@ -60,12 +60,7 @@ public abstract class FacetReduxJob extends Configured implements Tool
     }
 
     public static final int SIZE_1K = 1024;
-    public static final int SIZE_10K = 10 * SIZE_1K;
-    public static final int SIZE_100K = 100 * SIZE_1K;
     public static final int SIZE_1M = 1024 * SIZE_1K;
-    public static final int SIZE_10M = 10 * SIZE_1M;
-    public static final int SIZE_100M = 100 * SIZE_1M;
-    public static final int SIZE_1G = 1024 * SIZE_1M;
 
     public static final byte SEPARATOR = '|';
     public static final String SEPARATOR_STRING = new String(new byte[]{SEPARATOR});
@@ -116,7 +111,7 @@ public abstract class FacetReduxJob extends Configured implements Tool
      */
     protected static boolean[][] getKeyCombinations(final boolean... fixed)
     {
-        List<List<Integer>> ps = MathUtils.bitPermutations(KEY_LENGTH - fixed.length);
+        List<List<Integer>> ps = MathUtils.bitCombinations(KEY_LENGTH - fixed.length);
         boolean[][] p = new boolean[ps.size()][KEY_LENGTH];
         for (int x = 0; x < ps.size(); ++x) {
             Set<Integer> permutationSet = new HashSet<Integer>(ps.get(x));
