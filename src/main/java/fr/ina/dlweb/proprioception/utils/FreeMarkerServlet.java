@@ -1,4 +1,4 @@
-package fr.ina.dlweb.proprioception.web;
+package fr.ina.dlweb.proprioception.utils;
 
 import freemarker.cache.ClassTemplateLoader;
 import freemarker.template.Configuration;

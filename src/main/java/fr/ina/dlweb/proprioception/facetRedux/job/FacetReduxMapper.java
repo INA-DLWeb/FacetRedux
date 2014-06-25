@@ -30,8 +30,12 @@ public abstract class FacetReduxMapper<MAPKEY, MAPVAL> extends Mapper<MAPKEY, MA
     protected final FacetReduxJob.Long3Writable value = new FacetReduxJob.Long3Writable();
     private String yearFilter;
     private String yearFilterName;
-    private boolean[][] keyPermutations;
+    private boolean[][] keyCombinations;
 
+    /**
+     * these variables are kept at instance level to avoid
+     * local variables allocation costs at each call to map().
+     */
     private Map<String, String> metadata;
     private String url;
     private String month;
@@ -52,8 +56,8 @@ public abstract class FacetReduxMapper<MAPKEY, MAPVAL> extends Mapper<MAPKEY, MA
     protected void setup(final Context context) throws IOException, InterruptedException
     {
         super.setup(context);
-        keyPermutations = FacetReduxJob.getKeyPermutations(
-            context.getConfiguration().get(FacetReduxJob.PERMUTATION_TYPE_KEY)
+        keyCombinations = FacetReduxJob.getKeyCombinations(
+            context.getConfiguration().get(FacetReduxJob.COMBINATION_TYPE_KEY)
         );
         yearFilter = context.getConfiguration().get(FacetReduxJob.YEAR_KEY);
         yearFilterName = "not_year:" + yearFilter;
@@ -155,7 +159,7 @@ public abstract class FacetReduxMapper<MAPKEY, MAPVAL> extends Mapper<MAPKEY, MA
         level = metadata.get("level");
         if (level == null) level = "null";
 
-        emitPermutations(
+        emitCombinations(
             context, urlMd5, contentSha, contentSize,
             status, month,
             site, contentCategory, tld, sizeCategory, level
@@ -163,7 +167,7 @@ public abstract class FacetReduxMapper<MAPKEY, MAPVAL> extends Mapper<MAPKEY, MA
     }
 
     @SuppressWarnings("ForLoopReplaceableByForEach")
-    public void emitPermutations(Context context, byte[] urlMd5, byte[] contentSha, long size, String... keyPrefix)
+    public void emitCombinations(Context context, byte[] urlMd5, byte[] contentSha, long size, String... keyPrefix)
         throws IOException, InterruptedException
     {
         if (keyPrefix == null || keyPrefix.length != FacetReduxJob.KEY_LENGTH) return;
@@ -171,13 +175,13 @@ public abstract class FacetReduxMapper<MAPKEY, MAPVAL> extends Mapper<MAPKEY, MA
         value.set(size, size, 1);
 
         // for each permutation
-        for (int x = 0; x < keyPermutations.length; ++x) {
+        for (int x = 0; x < keyCombinations.length; ++x) {
 
             // generate key prefix
             keyBytes.clear();
             // for each item in the permutation
             for (int y = 0; y < FacetReduxJob.KEY_LENGTH; ++y) {
-                if (keyPermutations[x][y]) {
+                if (keyCombinations[x][y]) {
                     keyBytes.put((byte) '*').put(FacetReduxJob.SEPARATOR);
                 } else {
                     keyBytes.put(keyPrefix[y].getBytes(FacetReduxJob.US_ASCII)).put(FacetReduxJob.SEPARATOR);

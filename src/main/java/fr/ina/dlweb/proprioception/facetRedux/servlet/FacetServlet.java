@@ -3,7 +3,7 @@ package fr.ina.dlweb.proprioception.facetRedux.servlet;
 import fr.ina.dlweb.proprioception.facetRedux.FacetReduxConnector;
 import fr.ina.dlweb.proprioception.facetRedux.select.FilterOperator;
 import fr.ina.dlweb.proprioception.facetRedux.select.FilterType;
-import fr.ina.dlweb.proprioception.web.FreeMarkerServlet;
+import fr.ina.dlweb.proprioception.utils.FreeMarkerServlet;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;

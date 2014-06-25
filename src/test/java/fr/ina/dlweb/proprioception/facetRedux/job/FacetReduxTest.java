@@ -1,17 +1,12 @@
 package fr.ina.dlweb.proprioception.facetRedux.job;
 
 import com.google.common.primitives.Bytes;
-import fr.ina.dlweb.daff.DAFFConstants;
-import fr.ina.dlweb.hadoop.HadoopClientCDH4;
 import fr.ina.dlweb.hadoop.HadoopTestUtils;
 import fr.ina.dlweb.hadoop.io.StreamableDAFFRecordWritable;
-import fr.ina.dlweb.hadoop.io.StreamableDAFFRecordWriter;
 import fr.ina.dlweb.utils.StringUtils;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mrunit.mapreduce.MapDriver;
@@ -75,13 +70,16 @@ public class FacetReduxTest
 
         ENTRIES = new Object[][]{
             // month, status, site, contentCategory, tld, sizeCategory, level
-            new Object[]{URL_1, BODY_1,  new String[]{"ok", "2013-08", "france2.fr", "HTML", "org", FacetReduxJob.sizeRange(BODY_1.length()), "1"}},
-            new Object[]{URL_2, BODY_2,  new String[]{"ok", "2013-08", "tf1.fr", "IMAGE", "com", FacetReduxJob.sizeRange(BODY_2.length()), "1"}},
-            new Object[]{URL_2, BODY_2b, new String[]{"ok", "2013-08", "tf1.fr", "IMAGE", "com", FacetReduxJob.sizeRange(BODY_2b.length()), "1"}}
+            new Object[]{URL_1, BODY_1, new String[]{"ok", "2013-08", "france2.fr", "HTML", "org",
+                FacetReduxJob.sizeRange(BODY_1.length()), "1"}},
+            new Object[]{URL_2, BODY_2, new String[]{"ok", "2013-08", "tf1.fr", "IMAGE", "com",
+                FacetReduxJob.sizeRange(BODY_2.length()), "1"}},
+            new Object[]{URL_2, BODY_2b, new String[]{"ok", "2013-08", "tf1.fr", "IMAGE", "com",
+                FacetReduxJob.sizeRange(BODY_2b.length()), "1"}}
         };
     }
 
-    //@Test
+    @Test
     public void testRewindClear()
     {
         ByteBuffer b = ByteBuffer.allocate(100);
@@ -119,13 +117,14 @@ public class FacetReduxTest
     }
 
     @Test
-    public void showPermutations()
+    public void showCombinations()
     {
-        final boolean[][] p = FacetReduxJob.getKeyPermutation(false);
+        final boolean[][] combinations = FacetReduxJob.getKeyCombinations(false);
         int c = 0;
-        for (int x = 0; x < p.length; ++x) {
-            for (int y = 0; y < p[x].length; ++y) {
-                System.out.print(String.format("%-5s ", p[x][y]));
+        for (boolean[] combination : combinations) {
+            for (boolean slot : combination) {
+                //System.out.print(String.format("%-5s ", slot));
+                System.out.print(String.format("%d ", slot ? 1 : 0));
             }
             c++;
             System.out.print("\n");
@@ -177,20 +176,20 @@ public class FacetReduxTest
         */
 
         List<BytesWritable> keys = new ArrayList<BytesWritable>();
-        String[] permutations = new String[]{
+        String[] combinations = new String[]{
             "*|*|*|*|*|*|*",
             "*|ok|*|*|*|*|*",
             "2013-08|*|*|*|*|*|*",
         };
 
-        for (String p : permutations) {
+        for (String c : combinations) {
             keys.addAll(Arrays.asList(
-                getKey(p, FacetReduxJob.TYPE_MD5, "e0fb49fdc9fe32d8d56092dabd495092"),
-                getKey(p, FacetReduxJob.TYPE_SHA, "12a20b98973adb430d2ad8fca4619f01dec664bfc996d4bd6a84169db311b6df"),
-                getKey(p, FacetReduxJob.TYPE_MD5, "e4ce4ef96e7c1fc76bd158341e613cfd"),
-                getKey(p, FacetReduxJob.TYPE_SHA_EMPTY, ""),
-                getKey(p, FacetReduxJob.TYPE_MD5, "e4ce4ef96e7c1fc76bd158341e613cfd"),
-                getKey(p, FacetReduxJob.TYPE_SHA, "89655e8031959afdba456f9cc22fcec3a1473c51de9bd179f9b0e5a14e05fc4e")
+                getKey(c, FacetReduxJob.TYPE_MD5, "e0fb49fdc9fe32d8d56092dabd495092"),
+                getKey(c, FacetReduxJob.TYPE_SHA, "12a20b98973adb430d2ad8fca4619f01dec664bfc996d4bd6a84169db311b6df"),
+                getKey(c, FacetReduxJob.TYPE_MD5, "e4ce4ef96e7c1fc76bd158341e613cfd"),
+                getKey(c, FacetReduxJob.TYPE_SHA_EMPTY, ""),
+                getKey(c, FacetReduxJob.TYPE_MD5, "e4ce4ef96e7c1fc76bd158341e613cfd"),
+                getKey(c, FacetReduxJob.TYPE_SHA, "89655e8031959afdba456f9cc22fcec3a1473c51de9bd179f9b0e5a14e05fc4e")
             ));
         }
 
@@ -247,16 +246,16 @@ public class FacetReduxTest
         log.info("total bytes : " + bytes);
     }
 
-    public void createMockDaffRecord() throws IOException, InterruptedException
-    {
-        HadoopClientCDH4 client = FacetReduxJobDAFF.getHadoopClient();
-        FSDataOutputStream target = client.getFS().create(new Path("/user/public/david_test.daff"), true);
-        StreamableDAFFRecordWriter w = new StreamableDAFFRecordWriter(target, DAFFConstants.DAFF_CURRENT_VERSION);
-        w.write(new BytesWritable(), HadoopTestUtils.getMetaRecordWritable(META_1, BODY_1));
-        w.write(new BytesWritable(), HadoopTestUtils.getMetaRecordWritable(META_2, BODY_2));
-        w.write(new BytesWritable(), HadoopTestUtils.getMetaRecordWritable(META_2b, BODY_2b));
-        target.close();
-    }
+//    public void createMockDaffRecord() throws IOException, InterruptedException
+//    {
+//        HadoopClientCDH4 client = FacetReduxJobDAFF.getHadoopClient();
+//        FSDataOutputStream target = client.getFS().create(new Path("/user/public/david_test.daff"), true);
+//        StreamableDAFFRecordWriter w = new StreamableDAFFRecordWriter(target, DAFFConstants.DAFF_CURRENT_VERSION);
+//        w.write(new BytesWritable(), HadoopTestUtils.getMetaRecordWritable(META_1, BODY_1));
+//        w.write(new BytesWritable(), HadoopTestUtils.getMetaRecordWritable(META_2, BODY_2));
+//        w.write(new BytesWritable(), HadoopTestUtils.getMetaRecordWritable(META_2b, BODY_2b));
+//        target.close();
+//    }
 
     private List<Pair<BytesWritable, FacetReduxJob.Long3Writable>> getGeneratedMapperOutput(Object[][] entries)
         throws UnsupportedEncodingException
@@ -273,7 +272,7 @@ public class FacetReduxTest
             FacetReduxJob.Long3Writable value = new FacetReduxJob.Long3Writable();
             value.set(size, size, 1);
 
-            for (boolean[] p : FacetReduxJob.getKeyPermutations(FacetReduxJob.PermutationType.normal+"")) {
+            for (boolean[] p : FacetReduxJob.getKeyCombinations(FacetReduxJob.CombinationType.normal + "")) {
 
                 List<String> entryTuple = new ArrayList<String>();
                 for (int i = 0; i < p.length; ++i) entryTuple.add(p[i] ? "*" : entry[i]);

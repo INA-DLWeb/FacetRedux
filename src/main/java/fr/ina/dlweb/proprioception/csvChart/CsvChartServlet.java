@@ -1,6 +1,6 @@
 package fr.ina.dlweb.proprioception.csvChart;
 
-import fr.ina.dlweb.proprioception.web.FreeMarkerServlet;
+import fr.ina.dlweb.proprioception.utils.FreeMarkerServlet;
 
 /**
  * Date: 15/04/14

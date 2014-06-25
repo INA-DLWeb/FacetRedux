@@ -193,7 +193,7 @@
                     </descriptorRefs>
                     <archive>
                         <manifest>
-                            <mainClass>fr.ina.dlweb.proprioception.web.ProprioceptionServer</mainClass>
+                            <mainClass>fr.ina.dlweb.proprioception.ProprioceptionServer</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

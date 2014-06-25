@@ -76,9 +76,6 @@ public class FacetReduxJobAvro extends FacetReduxJob
         }
     }
 
-    // 328.71MB : 211BE548-73F1-11E3-BC6A-CC857A842EC4-m-00151.avro
-    //  77.63MB : C84A67DE-6273-11E3-BD32-8737F4AF75FA-m-00152.avro
-
     public static void main(String[] args) throws Exception
     {
         ArgsParser parser = ArgsParser.parseArgs(args);

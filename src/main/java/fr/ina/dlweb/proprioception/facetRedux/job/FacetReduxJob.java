@@ -37,8 +37,9 @@ public abstract class FacetReduxJob extends Configured implements Tool
 {
     public static final String YEAR_KEY = "fr.ina.dlweb.facetRedux.year";
 
-    public static final String PERMUTATION_TYPE_KEY = "fr.ina.dlweb.facetRedux.permutationType";
-    public static enum PermutationType {
+    public static final String COMBINATION_TYPE_KEY = "fr.ina.dlweb.facetRedux.combinationType";
+    public static enum CombinationType
+    {
         normal,
         explicitDate,
         wildcardDate,
@@ -92,28 +93,28 @@ public abstract class FacetReduxJob extends Configured implements Tool
 //        }
 //    }
 
-    public static boolean[][] getKeyPermutations(String permutationType)
+    public static boolean[][] getKeyCombinations(String permutationType)
     {
-        PermutationType p = permutationType == null
-            ? PermutationType.normal
-            : PermutationType.valueOf(permutationType);
+        CombinationType p = permutationType == null
+            ? CombinationType.normal
+            : CombinationType.valueOf(permutationType);
 
-        if (p == PermutationType.explicitDate) {
-            return getKeyPermutation(false, false);
-        } else if (p == PermutationType.wildcardDate) {
-            return getKeyPermutation(false, true);
+        if (p == CombinationType.explicitDate) {
+            return getKeyCombinations(false, false);
+        } else if (p == CombinationType.wildcardDate) {
+            return getKeyCombinations(false, true);
         } else {
             // 'normal' is the default
-            return getKeyPermutation(false);
+            return getKeyCombinations(false);
 
         }
     }
 
     /**
      * @param fixed the value for each fixed column
-     * @return the key permutations
+     * @return the key combinations
      */
-    protected static boolean[][] getKeyPermutation(final boolean... fixed)
+    protected static boolean[][] getKeyCombinations(final boolean... fixed)
     {
         List<List<Integer>> ps = MathUtils.bitPermutations(KEY_LENGTH - fixed.length);
         boolean[][] p = new boolean[ps.size()][KEY_LENGTH];
@@ -443,8 +444,8 @@ public abstract class FacetReduxJob extends Configured implements Tool
         Configuration c = j.getConfiguration();
         c.set(YEAR_KEY, parser.getInteger("year", true) + "");
         c.set(
-            PERMUTATION_TYPE_KEY,
-            PermutationType.valueOf(parser.get("type", PermutationType.normal+""))+""
+            COMBINATION_TYPE_KEY,
+            CombinationType.valueOf(parser.get("type", CombinationType.normal + ""))+""
         );
 
         // general

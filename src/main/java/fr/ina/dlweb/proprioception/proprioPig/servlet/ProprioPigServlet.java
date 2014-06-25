@@ -3,7 +3,7 @@ package fr.ina.dlweb.proprioception.proprioPig.servlet;
 import fr.ina.dlweb.proprioception.proprioPig.ProprioPigApp;
 import fr.ina.dlweb.proprioception.models.ChartInfo;
 import fr.ina.dlweb.proprioception.models.PigScript;
-import fr.ina.dlweb.proprioception.web.FreeMarkerServlet;
+import fr.ina.dlweb.proprioception.utils.FreeMarkerServlet;
 import org.apache.log4j.Logger;
 
 import javax.servlet.ServletException;

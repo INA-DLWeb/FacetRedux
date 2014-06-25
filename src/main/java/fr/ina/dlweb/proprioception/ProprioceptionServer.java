@@ -1,9 +1,9 @@
-package fr.ina.dlweb.proprioception.web;
+package fr.ina.dlweb.proprioception;
 
 import fr.ina.dlweb.proprioception.csvChart.CsvChartServlet;
 import fr.ina.dlweb.proprioception.facetRedux.servlet.FacetServlet;
-import fr.ina.dlweb.proprioception.proprioPig.servlet.ProprioPigServlet;
 import fr.ina.dlweb.utils.ArgsParser;
+import fr.ina.dlweb.utils.Properties2;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.mortbay.jetty.Server;
@@ -25,9 +25,13 @@ public class ProprioceptionServer
     public static final int DEFAULT_REDUCE_PARALLELISM = 7;
     public static final boolean DEFAULT_CLUSTER_OLD = false;
 
+    public static Properties2 getProperties()
+    {
+        return Properties2.forClass(ProprioceptionServer.class);
+    }
+
     public static void main(String[] args) throws Exception
     {
-        //BasicConfigurator.configure();
         Logger.getRootLogger().setLevel(Level.INFO);
 
         ArgsParser params = ArgsParser.parseArgs(args);
@@ -48,17 +52,17 @@ public class ProprioceptionServer
 
         // Facet-Redux
         addServlet(h, "/facet/*", new FacetServlet(
-            "dlwr00n02.ina.fr"
+            getProperties().getString("impala.server")
         ));
 
         // CSV-Charts
         addServlet(h, "/chart/*", new CsvChartServlet());
 
-        // Proprio-Pig
-        addServlet(h, "/propriopig/*", new ProprioPigServlet(
-            pigReduceParallelism,
-            oldCluster
-        ));
+//        // Proprio-Pig
+//        addServlet(h, "/propriopig/*", new ProprioPigServlet(
+//            pigReduceParallelism,
+//            oldCluster
+//        ));
 
         s.addHandler(h);
         s.start();

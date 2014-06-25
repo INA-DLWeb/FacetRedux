@@ -4,10 +4,8 @@ import fr.ina.dlweb.daff.DAFFConstants;
 import fr.ina.dlweb.daff.MetadataJSONContent;
 import fr.ina.dlweb.daff.Record;
 import fr.ina.dlweb.daff.RecordHeader;
-import fr.ina.dlweb.hadoop.HadoopClientCDH4;
 import fr.ina.dlweb.hadoop.io.StreamableDAFFInputFormat;
 import fr.ina.dlweb.hadoop.io.StreamableDAFFRecordWritable;
-import fr.ina.dlweb.mapreduce.MapReduceClientCDH4;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.mapreduce.Job;
@@ -66,40 +64,40 @@ public class FacetReduxJobDAFF extends FacetReduxJob
         }
     }
 
-    public static void main(String[] args) throws Exception
-    {
-        String year = "2013";
-        args = new String[]{
-            //"-input", "/user/public/dlweb-archive/metadata/data-sample/*",
-            "-input=/user/public/dlweb-archive/metadata/data/*",
-            "-output=/user/public/proprioception_job/" + year + "/" + System.currentTimeMillis() + "",
-            "-reducers=7",
-            "-year=" + year
-        };
+//    public static void main(String[] args) throws Exception
+//    {
+//        String year = "2013";
+//        args = new String[]{
+//            //"-input", "/user/public/dlweb-archive/metadata/data-sample/*",
+//            "-input=/user/public/dlweb-archive/metadata/data/*",
+//            "-output=/user/public/proprioception_job/" + year + "/" + System.currentTimeMillis() + "",
+//            "-reducers=7",
+//            "-year=" + year
+//        };
+//
+//        HadoopClientCDH4 client = getHadoopClient();
+//        client.fetchConfig();
+//
+//        MapReduceClientCDH4 mrClient = new MapReduceClientCDH4(client);
+//        mrClient.runTool(
+//            FacetReduxJobDAFF.class,
+//            args,
+//            new String[]{
+//                "./target/proprioception-web-0.2-SNAPSHOT-jar-with-dependencies.jar"
+//            }
+//        );
+//    }
 
-        HadoopClientCDH4 client = getHadoopClient();
-        client.fetchConfig();
-
-        MapReduceClientCDH4 mrClient = new MapReduceClientCDH4(client);
-        mrClient.runTool(
-            FacetReduxJobDAFF.class,
-            args,
-            new String[]{
-                "./target/proprioception-web-0.2-SNAPSHOT-jar-with-dependencies.jar"
-            }
-        );
-    }
-
-    public static HadoopClientCDH4 getHadoopClient()
-    {
-        HadoopClientCDH4 c = new HadoopClientCDH4(
-            "thaumas.ina.fr",
-            7180,
-            30,
-            "public",
-            "./hadoop-config-cache"
-        );
-        c.fetchConfig();
-        return c;
-    }
+//    public static HadoopClientCDH4 getHadoopClient()
+//    {
+//        HadoopClientCDH4 c = new HadoopClientCDH4(
+//            "thaumas.ina.fr",
+//            7180,
+//            30,
+//            "public",
+//            "./hadoop-config-cache"
+//        );
+//        c.fetchConfig();
+//        return c;
+//    }
 }

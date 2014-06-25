@@ -2,7 +2,9 @@ package fr.ina.dlweb.proprioception.facetRedux;
 
 import fr.ina.dlweb.hadoop.HadoopClientCDH4;
 import fr.ina.dlweb.mapreduce.MapReduceClientCDH4;
+import fr.ina.dlweb.proprioception.ProprioceptionServer;
 import fr.ina.dlweb.utils.ClassUtils;
+import fr.ina.dlweb.utils.Properties2;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.util.Tool;
 
@@ -27,12 +29,13 @@ public class JobLauncher
 
     public static HadoopClientCDH4 getHadoopClient()
     {
+        Properties2 p = ProprioceptionServer.getProperties();
         HadoopClientCDH4 c = new HadoopClientCDH4(
-            "dlwr00n01.ina.fr",
-            7180,
-            8,
-            "public",
-            "./hadoop-config-cache-00"
+            p.getString("hadoop.cdh4.jobTracker.host"),
+            p.getInteger("hadoop.cdh4.jobTracker.port"),
+            p.getInteger("hadoop.cdh4.mapReduceServiceId"),
+            p.getString("hadoop.cdh4.username"),
+            "./hadoop-cluster0-config-cache"
         );
         c.fetchConfig();
         return c;
@@ -46,7 +49,8 @@ public class JobLauncher
 
         String manualPath = null;
         if (autoPath == null || !autoPath.endsWith(".jar")) {
-            manualPath = new File("./target/proprioception-web-0.2-SNAPSHOT-jar-with-dependencies.jar").getAbsolutePath();
+            manualPath = new File("./target/proprioception-web-0.2-SNAPSHOT-jar-with-dependencies.jar")
+                .getAbsolutePath();
             System.out.println("MANUAL_JAR_PATH: " + manualPath);
         }
 
