@@ -1,0 +1,19 @@
+<html>
+<head>
+    <title>import data from hadoop</title>
+</head>
+<body>
+<form method="post" action"import.html">
+    <label for="source">Source</label>
+    <input type="text" id="source" name="source" style="width:300px" <#if params.source??>value="${params.source}"</#if> />
+
+    <label for="year">Year</label>
+    <input type="text" id="year" name="year" style="width:80px" <#if params.year??>value="${params.year}"</#if> />
+
+    <input type="submit" value="import data">
+</form>
+<div style="color:red; font-size:16px">
+    ${message}
+</div>
+</body>
+</html>

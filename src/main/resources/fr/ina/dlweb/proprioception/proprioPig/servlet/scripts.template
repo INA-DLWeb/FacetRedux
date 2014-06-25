@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Proprioception - Pig (scripts)</title>
+<meta http-equiv="Content-Type" content="text/html;charset=UTF-8" />
+<script type="text/javascript" src="./js/jquery-1.8.3.min.js"></script>
+<script type="text/javascript" src="./js/codemirror.js"></script>
+<script type="text/javascript" src="./js/searchcursor.js"></script>
+<script type="text/javascript" src="./js/match-highlighter.js"></script>
+<script type="text/javascript" src="./js/pig.js"></script>
+<script type="text/javascript">
+	$(function() {
+		$('textarea').each(function(index, e) {
+			e.editor = CodeMirror.fromTextArea(e, {
+				lineNumbers: true,
+				matchBrackets: true,
+				indentUnit: 4,
+				mode: "text/x-pig",
+				onCursorActivity: function() {
+					e.editor.matchHighlight("CodeMirror-matchhighlight");
+				}
+			});
+		});
+
+		// open the jobBox of the currently worked on Script
+        var openScript = window.location.hash.substring(1);
+        $("#" + openScript + ".jobBox").removeClass("reduced");
+	});
+</script>
+<link rel="stylesheet" type="text/css" media="all" href="./style.css" />
+<link rel="stylesheet" href="./codemirror.css">
+</head>
+<body>
+	<a href="?a=save">save</a>
+    <div style="width:100%; text-align:center;">
+        <h1>Proprioception (scripts | <a href="./jobs">jobs</a>)</h1>
+    </div>
+
+    <hr/>
+
+    <div>
+        <h3>New script</h3>
+        <form action="./scripts" method="post">
+            <input type="hidden" name="a" value="addScript" />
+            Name: <input class="name" type="text" name="n" value="script name" /><br />
+            <textarea id="q" name="q" cols="110" rows="20"></textarea>
+            <br/>
+
+            <label for="ct">Type: </label><select id="ct" name="ct" size="1">
+                <option value="">none</option>
+                <option>hbar</option>
+                <option>pie</option>
+                <option>stream</option>
+                <option>bar</option>
+                <option>line</option>
+                <option>cline</option>
+                <option>double</option>
+                <option>scatter</option>
+            </select>
+            <label for="csc">Sort : </label><select id="csc" name="csc" size="1">
+                <option value="">none</option>
+                <option>x</option>
+                <option>y</option>
+                <option>key</option>
+            </select>
+            <label for="cxt">X type: </label><select id="cxt" name="cxt" size="1">
+                <option>date</option>
+                <option>int</option>
+                <option>string</option>
+            </select>
+            <label for="cx">X column: </label> <input id="cx" name="cx" type="text" style="width:25px" />
+            <label for="cy">Y column:</label> <input id="cy" name="cy" type="text" style="width:25px" />
+            <label for="ck">Key column:  </label> <input id="ck" name="ck" type="text" style="width:25px" />
+            <br/>
+            <label for="ctr">Transform:  </label> <input id="ctr" name="ctr" type="text" style="width:800px" />
+
+            <br/><br/>
+            <input type="submit" value="Add script"/>
+        </form>
+    </div>
+
+	<hr />
+
+    <div style="position:relative;">
+        <h3>Scripts (${scripts?size})</h3>
+        <div class="jobToggle">
+            <a href="javascript:void(0)" onclick="$('.jobBox').removeClass('reduced');" style="background:none;">expend scripts</a>
+            <a href="javascript:void(0)" onclick="$('.jobBox').addClass('reduced');" style="background:none;">collapse scripts</a>
+        </div>
+
+        <#list scripts as s>
+        <#assign sid = s.id>
+        <div class="jobBox reduced" id="script_${sid}">
+			<a href="javascript:void(0)" onclick="$('#script_${sid}').toggleClass('reduced');" class="jobToggle">toggle script</a>
+			<form action="./scripts" method="post">
+
+				<div style="border-bottom:1px solid #ddd; height:20px;">
+					<div style="width: 10px;" class="fieldBox <#if s.failure??>error<#else>success</#if>">&nbsp;</div>
+					<div class="fieldBox scriptName"><em>Name</em>: <input class="name" type="text" name="nn" value="${s.name}" /></div>
+					<div class="clear">&nbsp;</div>
+				</div>
+
+				<input type="hidden" name="n" value="${s.name}" />
+                <input type="hidden" name="a" value="updateScript" />
+                <textarea id="${sid}_area" name="q" cols="110" rows="20">${s.query}</textarea>
+				<#if s.failure?? && s.failure.errorLine??>
+				<script type="text/javascript">
+				$(function() {
+					$('#${sid}_area').each(function(i,e) {
+						var m = e.editor.markText(
+							{line:${s.failure.errorLine}-1, ch:${s.failure.errorColumn}},
+							{line:1000, ch:1000},
+							'error-mark'
+						);
+						console.log(m);
+					});
+				});
+				</script>
+				</#if>
+                <br/>
+                
+                <label for="ct">Type: </label><select id="ct" name="ct" size="1">
+                    <option value="">none</option>
+                    <option <#if s.chartInfo?? && s.chartInfo.type = 'hbar'>selected</#if>>hbar</option>
+                    <option <#if s.chartInfo?? && s.chartInfo.type = 'pie'>selected</#if>>pie</option>
+                    <option <#if s.chartInfo?? && s.chartInfo.type = 'stream'>selected</#if>>stream</option>
+                    <option <#if s.chartInfo?? && s.chartInfo.type = 'bar'>selected</#if>>bar</option>
+                    <option <#if s.chartInfo?? && s.chartInfo.type = 'line'>selected</#if>>line</option>
+                    <option <#if s.chartInfo?? && s.chartInfo.type = 'cline'>selected</#if>>cline</option>
+                    <option <#if s.chartInfo?? && s.chartInfo.type = 'double'>selected</#if>>double</option>
+                    <option <#if s.chartInfo?? && s.chartInfo.type = 'scatter'>selected</#if>>scatter</option>
+                </select>
+                <label for="csc">Sort : </label><select id="csc" name="csc" size="1">
+                    <option value="">none</option>
+                    <option <#if s.chartInfo?? && s.chartInfo.sort = 'x'>selected</#if>>x</option>
+                    <option <#if s.chartInfo?? && s.chartInfo.sort = 'y'>selected</#if>>y</option>
+                    <option <#if s.chartInfo?? && s.chartInfo.sort = 'key'>selected</#if>>key</option>
+                </select>
+                <label for="cxt">X type: </label><select id="cxt" name="cxt" size="1">
+                    <option>date</option>
+                    <option <#if s.chartInfo?? && s.chartInfo.xType = 'int'>selected</#if>>int</option>
+                    <option <#if s.chartInfo?? && s.chartInfo.xType = 'string'>selected</#if>>string</option>
+                </select>
+                <label for="cx">X column: </label> <input id="cx" name="cx" type="text" style="width:25px" <#if s.chartInfo?? && s.chartInfo.x??>value="${s.chartInfo.x}"</#if> />
+                <label for="cy">Y column:</label> <input id="cy" name="cy" type="text" style="width:25px" <#if s.chartInfo?? && s.chartInfo.y??>value="${s.chartInfo.y}"</#if> />
+                <label for="ck">Key column:  </label> <input id="ck" name="ck" type="text" style="width:25px" <#if s.chartInfo?? && s.chartInfo.key??>value="${s.chartInfo.key}"</#if> />
+                <br/>
+                <label for="ctr">Transform:  </label> <input id="ctr" name="ctr" type="text" style="width:800px" <#if s.chartInfo?? && s.chartInfo.transform??>value="${s.chartInfo.transform}"</#if> />
+                
+                <br/><br/>
+                <input type="submit" value="Update script" />
+            </form>
+
+			<form action="./scripts" method="post" style="position:absolute; right:5px;">
+                <input type="hidden" name="a" value="deleteScript" />
+                <input type="hidden" name="n" value="${s.name}" />
+                <input type="button" value="Delete script" onclick="if (confirm('really delete ?')) { this.form.submit() }" />
+            </form>
+
+            <#if s.failure??>
+			<h4>Error</h4>
+				${s.failure.message?replace('[<>]', '|', 'r')}<br/>
+				<#if s.failure.trace??>
+					<a href="javascript:void(0)" onclick="$('#${sid}_error_details').toggleClass('hidden');">toggle details</a>
+					<pre id="${sid}_error_details" class="hidden">${s.failure.trace?replace('[<>]', '|', 'r')}</pre>
+				</#if>
+			<#else>
+			<form action="./jobs" method="post">
+                <input type="hidden" name="a" value="startJob" />
+                <input type="hidden" name="n" value="${s.name}" />
+                <input type="submit" value="Start job"/>
+            </form>
+			</#if>
+
+        </div>
+        </#list>
+        <hr />
+    </div>
+
+    <hr />
+
+    <div class="footer">${footer}</div>
+
+</body>
+</html>

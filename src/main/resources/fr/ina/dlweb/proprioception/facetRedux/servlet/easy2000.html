@@ -1,0 +1,304 @@
+﻿<!DOCTYPE html>
+<html><!-- easy2000 -->
+<head>
+<meta charset="utf-8" />
+<link rel="shortcut icon" type="image/x-icon" href="./favicon.ico" />
+<title id="title">FacetRedux</title>
+<style type="text/css">
+/*::root {
+  var-menu-height: 50px;
+}*/
+
+body {
+	font-family:verdana,sans-serif;
+	font-size:12px;
+}
+
+body,body,form {
+	margin:0;
+	padding:0;
+}
+div.root {
+	position:fixed;
+	height:calc(100% - 0px);
+	width:calc(100% - 0px);
+	margin:0;
+	padding:0;
+    min-width:840px;
+}
+div.content > iframe {
+	position:absolute;
+	top:0;
+	left:0;
+	display:block;
+	height:100%;
+	z-index:0;
+	opacity:1;
+}
+
+input,select,textarea { border:1px solid black; }
+
+select#xCol { width:60px }
+select#yCol { width:95px }
+select#keyCol { width:70px }
+select#filterCol { width:70px }
+select#filterType { width:35px }
+select#sort { width:70px }
+select#year { width:50px }
+select#year2 { width:70px }
+input#filterVal { width:210px }
+input#desc { width:183px; }
+
+label[for=transform] { display:block; float:left; width:335px;}
+textarea#transform,textarea#filter { width:328px; height:60px; }
+a#update { font-size:20px; }
+
+a#tooltip {
+    display:inline-block; background-color:#fff; font-size:12px; float:right; position:relative; top:5px;
+}
+
+/* more ? */
+body.more #more { display:block; }
+#more { display:none; }
+body.more div.content {
+	height:calc(100% - (140px + 22px));
+}
+div.content {
+	height:calc(100% - (45px + 22px));
+	/*background-color:yellow;*/
+	border-bottom:1px solid #aaa;
+	position:relative;
+}
+body.more div.top {
+	height:140px;
+}
+div.top {
+	height:45px;
+	padding:10px;
+	border-bottom:1px solid #aaa;
+}
+
+
+</style>
+<script src="./facetChart.js" type="text/javascript"></script>
+<script type="text/javascript">(function(){
+var chartKeys = {
+	'url'        : { doEval: false, defaultValue: "/ext/gebeil_counts_reduced.csv" },
+	'url2'       : { doEval: false, defaultValue: null },
+	'type'       : { doEval: false, defaultValue: "bar" },
+	'x'          : { doEval: false, defaultValue: "1" },
+	'y'          : { doEval: false, defaultValue: "3" },
+	'key'        : { doEval: false, defaultValue: "2" },
+	'xType'      : { doEval: false, defaultValue: "date" },
+	'sort'       : { doEval: false, defaultValue: "x" },
+	'transform'  : { doEval: false, defaultValue: null },
+	'filter'     : { doEval: false, defaultValue: null },
+	'colorSuffix': { doEval: false, defaultValue: '' }
+};
+
+var advancedKeys = JSON.parse(JSON.stringify(chartKeys));
+advancedKeys['sql'] = { doEval:false, defaultValue:"" };
+advancedKeys['title'] = { doEval:false, defaultValue:"Chart title" };
+
+var LIMIT = '100';
+var xCols = [ 'status', 'month', 'site', 'content', 'tld', 'size', 'level' ];
+var yCols = [
+    'meta_count', 'url_count', 'sha_count', 'meta_size', 'real_size',
+    // average content size
+    'real_size/sha_count',
+    // duplication ratio
+    'meta_size/real_size'
+];
+var chartTypes = ['stream', 'hbar', 'bar', 'pie', 'donut', /*'line', 'cline', 'scatter', 'double', */'CSV'];
+var filterTypes = ['=','like','>','>=','<','<=','!='];
+var years = [];
+for (var y=new Date().getFullYear()-1, ly=1996; y!=ly; --y) years.push(y);
+var formKeys = {
+	'xCol'      : { doEval: false, defaultValue: "month", options:[undefined].concat(xCols) },
+	'yCol'      : { doEval: false, defaultValue: "meta_count", options:yCols },
+	'keyCol'    : { doEval: false, defaultValue: undefined, options:[undefined].concat(xCols) },
+    'filterCol' : { doEval: false, defaultValue: undefined, options:[undefined].concat(xCols).concat(yCols) },
+    'filterType': { doEval: false, defaultValue: '=', options:filterTypes },
+    'filterVal' : { doEval: false, defaultValue: undefined },
+	'sort'      : { doEval: false, defaultValue: "x", options:[undefined, "x", "y", "key"] },
+	'top'       : { doEval: true, defaultValue: false },
+	'transform' : { doEval: false, defaultValue: '' },
+	'filter'    : { doEval: false, defaultValue: '' },
+	'desc'      : { doEval: false, defaultValue: "FacetRedux" },
+	'type'      : { doEval: false, defaultValue: "hbar", options:chartTypes },
+	'year'      : { doEval: false, defaultValue: new Date().getFullYear()-1, options:years },
+	'year2'     : { doEval: false, defaultValue: undefined, options:[undefined].concat(years) },
+	'showMore'  : { doEval: true, defaultValue: false }
+};
+
+var chart = new FacetChart(document, 'chart', formKeys, chartKeys);
+
+updateChart = function() {
+    // read form data
+	var formData = chart.readForm();
+	
+	// update form
+	var b = document.getElementsByTagName('body')[0];
+	if (formData.showMore) {
+		b.classList.add('more');
+	} else {
+		b.classList.remove('more');
+	}
+	
+    // get chart data from form data
+    var chartData = getChartData(formData);
+    if (chartData['error'] != undefined) {
+        alert(chartData['error']);
+        return;
+    }
+
+    // display chart !
+    chart.updateIframe('iframe', formData, chartData);
+
+    // advanced query link
+    var advancedFragment = chart.createFragment(chartData, advancedKeys);
+    document.getElementById('tooltip').href = './advanced.html#' + advancedFragment;
+};
+
+var getChartData = function(fd) {
+	var cd = {};
+
+	cd.xType = fd.xCol == 'month' ? 'date' : 'string';
+	cd.type = fd.type;
+	cd.x = xCols.indexOf(fd.xCol);
+	cd.y = xCols.length + yCols.indexOf(fd.yCol);
+	cd.key = xCols.indexOf(fd.keyCol);
+	cd.sort = fd.sort;
+	if (fd.transform.trim() != '') cd.transform = "function(m){\n " + fd.transform + " ;\n return m; }";
+	if (fd.filter.trim() != '') cd.filter = "function(m){\n " + fd.filter + " ;\n return m; }";
+	
+	// some basic validation
+	if (cd.type == 'stream') {
+		if (cd.xType != 'date') {
+			return {error:'Stream charts only take dates as X data.'};
+		}
+		// stream data values must be sorted
+		cd.sort = 'x';
+	}
+	if (fd.top && fd.keyCol != undefined) {
+		return {error:'"Top" cannot be used in combination with a key.'};
+	}
+	if (fd.filterCol != undefined && yCols.indexOf(fd.filterCol) >= 0 && !fd.filterVal.match(/^\d+$/)) {
+		return {error:'filter on Y value must be a number (' + fd.filterVal + ')'};
+	}
+	
+	var sql = 'select ' + xCols.join(', ') + ', ' + yCols.join(', ');
+	var table = 'facetRedux.facets_' + fd.year + 'p'; // TABLE
+	sql += ' from ' + table + ' where ' + xCols.reduce(function(s,c,i) {
+		var cs;
+		if (c == 'status' && [fd.filterCol, fd.xCol, fd.keyCol].indexOf('status') < 0) {
+			cs = s + c + "='ok'";
+		} else if (c == fd.filterCol) {
+			cs = s + c + ' ' + fd.filterType +" '" + fd.filterVal + "'";
+		} else {
+			var wantAny = fd.xCol != c && fd.keyCol != c;
+			cs = s + c + (wantAny ? '=' : '!=') + "'*'";
+		}
+		return cs + ((i < xCols.length - 1) ? ' AND ' : '')
+	}, "");
+	sql += yCols.reduce(function(s,c) {
+		if (c != fd.filterCol) return s;
+		return s + ' AND ' + fd.filterCol + ' ' + fd.filterType +" " + fd.filterVal + "";
+	}, "");
+	if (fd.top) {
+		sql += ' ORDER BY ' + fd.yCol + ' DESC LIMIT ' + LIMIT;
+	}
+	//console.log(sql);
+	cd.url = "/facet/data.csv?sql=" + encodeURIComponent(sql);
+    cd.sql = sql;
+
+    // seconds chart
+    if (fd.year2) {
+    	var t2 = table.replace(fd.year+'', fd.year2+'');
+    	var s2 = sql.replace(table, t2);
+    	cd.url2 = "/facet/data.csv?sql=" + encodeURIComponent(s2);
+    }
+
+	console.log("chartData : " + JSON.stringify(cd, undefined, " "));
+    return cd;
+};
+
+window.onload = function() {
+	var d = document;
+	d.getElementById('update').addEventListener('click', updateChart);
+
+    // fill form with data from url
+	var formData = chart.readUrlFragment();
+    var chartData = getChartData(formData);
+    chart.updateForm(formData);
+	// display chart
+    updateChart();
+
+    //chart.updateIframe('iframe', formData, chartData);
+};
+
+})();</script>
+
+</head>
+<body>
+<div class="root">
+<div class="top">
+
+<form id="chart">
+
+<label for="xCol">X:</label>
+<select id="xCol" size="1"></select>
+
+<label for="yCol">Y:</label>
+<select id="yCol" size="1"></select>
+
+<label for="keyCol">Key:</label>
+<select id="keyCol" size="1"></select>
+
+<label for="filterCol">filter:</label>
+<select id="filterCol" size="1"></select>
+<select id="filterType" size="1"></select>
+<input type="text" id="filterVal" />
+
+<br/>
+
+<label for="type">Year</label>
+<select id="year" size="1"></select>
+<select id="year2" size="1"></select>
+
+<label for="type">Chart</label>
+<select id="type" size="1"></select>
+
+<label for="sort">Sort</label>
+<select id="sort" size="1"></select>
+
+<label for="top">Top100</label>
+<input type="checkbox" id="top" />
+
+<label for="desc">Title</label>
+<input type="text" id="desc" />
+
+<label for="showMore">more</label>
+<input type="checkbox" id="showMore" />
+
+<div id="more">
+<label for="transform">Transform(m):</label><label for="filter">Filter(m):</label>
+<br/>
+<textarea id="transform" ></textarea>
+<textarea id="filter" ></textarea>
+</div>
+
+<a id="update" href="javascript:void(0);">update</a>
+<a id="tooltip" href="./advanced.html">advanced query</a>
+
+</form>
+
+</div>
+<div class="content">
+ <iframe id="iframe" width="100%" src="" frameborder="0" allowtransparency="true"></iframe>
+</div>
+
+</div>
+
+</body>
+</html>

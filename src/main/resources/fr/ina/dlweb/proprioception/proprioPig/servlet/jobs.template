@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Proprioception : Pig (jobs)</title>
+<!--meta http-equiv="Content-Type" content="text/html;charset=UTF-8" /-->
+<script type="text/javascript" src="./js/jquery-1.8.3.min.js"></script>
+<script type="text/javascript" src="./js/codemirror.js"></script>
+<script type="text/javascript" src="./js/runmode.js"></script>
+<script type="text/javascript" src="./js/pig.js"></script>
+<link rel="stylesheet" type="text/css" media="all" href="./style.css" />
+<link rel="stylesheet" href="./codemirror.css">
+<script type="text/javascript">
+$(function() {
+    // add CodeMirror items
+    $(".code").each(function(index, node) {
+        if (node && node.id) {
+            var newNode =  document.getElementById(node.id + "2");
+            CodeMirror.runMode(node.innerHTML, "text/x-pig", newNode);
+
+            /*
+            var errorColumn = newNode.getAttribute("error-column");
+            var errorLine = newNode.getAttribute("error-line");
+            if (errorLine !== undefined && errorColumn !== undefined) {
+                newNode.editor.markText(
+                    {line:errorLine-1, ch:errorColumn},
+                    {line:1000, ch:1000},
+                    'error-mark'
+                );
+            }
+            */
+        }
+	});
+
+	// open jobBox of currently worked on Job
+	var openJob = window.location.hash.substring(1);
+	$("#" + openJob + ".jobBox").removeClass("reduced");
+
+});
+</script>
+</head>
+<body>
+	<a href="?a=save">save</a>
+    <div style="width:100%; text-align:center;">
+        <h1>Proprioception (jobs | <a href="./scripts">scripts</a>)</h1>
+        <h3>queue size: ${jobQueueSize}</h3>
+    </div>
+    
+    <hr/>
+
+    <#if currentJob??>
+        <h3>Current job</h3>
+        name: ${currentJob.name}<br/>
+        id: ${currentJob.id}<br/>
+        progress: ${currentJob.progress}%<br/>
+        add: ${currentJob.dateAdded?string("yyyy-MM-dd HH:mm:ss")}<br/>
+        start: ${currentJob.dateStarted?string("yyyy-MM-dd HH:mm:ss")}<br/>
+        Query:
+        <pre id="job_current" class="hidden code">${currentJob.query}</pre>
+        <pre id="job_current2" class="preBox cm-s-default"></pre>
+        <hr />
+    </#if>
+
+    <div>
+        <h3>Results (${results?size})</h3>
+        <#list results as j>
+        <div class="jobBox reduced" id="job_${j.id}">
+            <a href="javascript:void(0)" onclick="$('#job_${j.id}').toggleClass('reduced');" class="jobToggle">toggle result</a>
+
+            <div style="border-bottom:1px solid #ddd; height:19px; overflow:hidden;">
+                <div class="fieldBox <#if j.failure>error<#else>success</#if>"></div>
+                <div class="fieldBox"><em>id</em>${j.id}</div>
+                <div class="fieldBox"><em>start</em><#if j.started??>${j.started?string("yyyy-MM-dd HH:mm:ss")}<#else>no</#if></div>
+                <div class="fieldBox"><em>end</em><#if j.done??>${j.done?string("yyyy-MM-dd HH:mm:ss")}<#else>no</#if></div>
+                <div class="fieldBox" style="min-width:90px;"><em>output</em><#if j.results??>${j.results?size}<#else>none</#if></div>
+                <div class="fieldBox"><em>name</em>${j.name}</div>
+                <div class="clear">&nbsp;</div>
+            </div>
+
+            <h4>${j.name}</h4>
+
+			<h4>Dates</h4>
+			Add: ${j.added?string("yyyy-MM-dd HH:mm:ss")}<br/>
+			Start: <#if j.started??>${j.started?string("yyyy-MM-dd HH:mm:ss")}<#else>no</#if><br/>
+			End: <#if j.done??>${j.done?string("yyyy-MM-dd HH:mm:ss")}<#else>no</#if><br/>
+			
+            <h4>Results</h4>
+            <#if j.results?? && j.results?size &gt; 0>
+                <a href="./results.csv?jid=${j.id}">download ${j.results?size} results</a>
+                <#if j.chartInfo??>
+                    <a target="_blank" href="/chart/index.html#url=${basePath}/results.csv?jid=${j.id}&amp;type=${j.chartInfo.type}&amp;x=${j.chartInfo.x}&amp;key=${j.chartInfo.key}&amp;y=${j.chartInfo.y}&amp;xType=${j.chartInfo.xType}&amp;sort=${j.chartInfo.sort?string}&amp;transform=${j.chartInfo.transformEncoded}">
+                        display chart (${j.chartInfo.type})
+                    </a>
+                </#if>
+
+				<#assign s = 5>
+				<#if j.results?size &lt; s><#assign s = j.results?size></#if>
+				<pre class="preBox">
+<#list 0..(s-1) as i>${j.results[i]}
+</#list></pre>
+            <#else>
+            none
+            </#if>
+
+            <#if j.failure>
+                <h4>Error</h4>
+                <#if j.message??>${j.message?replace('[<>]', '|', 'r')}<#else>unknown error</#if>
+                <br/>
+                <#if j.trace??>
+                    <a href="javascript:void(0)" onclick="$('#${j.id}_error_details').toggleClass('hidden');">toggle details</a>
+                    <pre id="${j.id}_error_details" class="hidden preBox">${j.trace?replace('[<>]', '|', 'r')}</pre>
+                </#if>
+            </#if>
+            
+            <h4>Query</h4>
+            <#assign q = j.query>
+            <#if j.errorLine?? && j.errorColumn??>
+                error @ ${j.errorLine}:${j.errorColumn}<br/>
+                <#assign q = q?replace('^((?:[^\r\n]+[\r\n]+){' + (j.errorLine-1) + '})(.{' +  j.errorColumn + '})(.*)$', '$1$2\'<ERROR>\'$3', 'fmr') + '\'</ERROR>\''>
+            </#if>
+            <pre class="code hidden" id="${j.id}_code">${q}</pre>
+            <pre  class="preBox cm-s-default" id="${j.id}_code2"></pre>
+
+            <h4>Edit</h4>
+            <form action="./jobs" method="post">
+                <input type="hidden" name="a" value="deleteResult" />
+                <input type="hidden" name="jid" value="${j.id}" />
+                <input type="button" value="Delete result" onclick="if (confirm('really delete ?')) { this.form.submit() }" />
+            </form>
+
+            <form action="./jobs#${j.id}" method="post">
+                <input type="submit" value="Update result chart" />
+                <br /><br />
+
+                <input type="hidden" name="a" value="updateResult" />
+                <input type="hidden" name="jid" value="${j.id}" />
+                <label for="ct">Type: </label><select id="ct" name="ct" size="1">
+                    <option value="">none</option>
+                    <option <#if j.chartInfo?? && j.chartInfo.type = 'hbar'>selected</#if>>hbar</option>
+                    <option <#if j.chartInfo?? && j.chartInfo.type = 'pie'>selected</#if>>pie</option>
+                    <option <#if j.chartInfo?? && j.chartInfo.type = 'stream'>selected</#if>>stream</option>
+                    <option <#if j.chartInfo?? && j.chartInfo.type = 'bar'>selected</#if>>bar</option>
+                    <option <#if j.chartInfo?? && j.chartInfo.type = 'line'>selected</#if>>line</option>
+                    <option <#if j.chartInfo?? && j.chartInfo.type = 'cline'>selected</#if>>cline</option>
+                    <option <#if j.chartInfo?? && j.chartInfo.type = 'double'>selected</#if>>double</option>
+                    <option <#if j.chartInfo?? && j.chartInfo.type = 'scatter'>selected</#if>>scatter</option>
+                </select>
+                <label for="csc">Sort : </label><select id="csc" name="csc" size="1">
+                    <option value="">none</option>
+                    <option <#if j.chartInfo?? && j.chartInfo.sort = 'x'>selected</#if>>x</option>
+                    <option <#if j.chartInfo?? && j.chartInfo.sort = 'y'>selected</#if>>y</option>
+                    <option <#if j.chartInfo?? && j.chartInfo.sort = 'key'>selected</#if>>key</option>
+                </select>
+                <label for="cxt">X type: </label><select id="cxt" name="cxt" size="1">
+                    <option>date</option>
+                    <option <#if j.chartInfo?? && j.chartInfo.xType = 'int'>selected</#if>>int</option>
+                    <option <#if j.chartInfo?? && j.chartInfo.xType = 'string'>selected</#if>>string</option>
+                </select>
+                <label for="cx">X column: </label> <input id="cx" name="cx" type="text" style="width:25px" <#if j.chartInfo?? && j.chartInfo.x??>value="${j.chartInfo.x}"</#if> />
+                <label for="cy">Y column:</label> <input id="cy" name="cy" type="text" style="width:25px" <#if j.chartInfo?? && j.chartInfo.y??>value="${j.chartInfo.y}"</#if> />
+                <label for="ck">Key column:  </label> <input id="ck" name="ck" type="text" style="width:25px" <#if j.chartInfo?? && j.chartInfo.key??>value="${j.chartInfo.key}"</#if> />
+                <br/>
+                <label for="ctr">Transform:  </label> <input id="ctr" name="ctr" type="text" style="width:800px" <#if j.chartInfo?? && j.chartInfo.transform??>value="${j.chartInfo.transform}"</#if> />
+
+            </form>
+        </div>
+        </#list>
+        <hr />
+    </div>
+
+</body>
+</html>

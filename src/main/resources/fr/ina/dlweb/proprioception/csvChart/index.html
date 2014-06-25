@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link href="nv.d3.css" rel="stylesheet" type="text/css" />
+<script src="./d3.v2.min.js"></script>
+<script src="nv.d3.min.js"></script>
+<style>
+body     { overflow-y:scroll; min-height:calc(100% - 20px); /*border:1px solid red;*/  }
+html     { height: 100%; }
+text     { font:12px sans-serif; }
+#chart   { position:relative; height:calc(100vh - 20px); }
+#message { display:block; background-color:yellow; color:black; font-weight:bold; font-size:20px; }
+</style>
+</head>
+<body>
+  <div id="message">Waiting for data ...</div>
+  <div id="chart"></div>
+  <!--svg id="chart"></svg-->
+<script>
+//console.log(d3);
+
+var getData = function(params, cb) {
+
+	// request data from server
+	getDataMulti(params, function(data) {
+
+         var fixedData = fixData(data, params);
+
+		 // group parsed lines by key
+		 var groupedData = d3.nest()
+                 .key(function(d) { return d == undefined ? '-' : d.key; })
+                 .entries(fixedData);
+
+         // fix for pies+donuts
+         if(params.type === 'pie' || params.type === 'donut'){
+             groupedData = [groupedData[0].values];
+         }
+
+         //console.log(data);
+		 cb(groupedData);
+	});
+};
+
+var getDataMulti = function(params, cb) {
+    // build url array
+    var urls = [params.url];
+    if (params.url2) urls.push(params.url2);
+
+    // loop context
+    var parseContext = {};
+    var mergedData = [];
+    parseContext.urlKey = 65;
+
+    // get message element
+    var message = document.getElementById('message');
+
+    // loop body
+    var loop = function() {
+        // done
+        if (urls.length == 0) {
+            message.style.display = 'none';
+            cb(mergedData);
+            return;
+        }
+
+        // next url
+        var url = urls.pop();
+        d3.text(url, function(content) {
+
+            // request failure
+            if (content && content.indexOf('failure:') == 0) {
+                message.innerHTML = content;
+                message.style.display = 'block';
+                return;
+            }
+
+            var data = parseCSV(content, params, parseContext);
+            mergedData = mergedData.concat(data);
+            parseContext.urlKey++;
+
+            loop()
+        });
+    };
+    loop();
+};
+
+var parseCSV = function(content, params, parseContext) {
+    var p, d, x, y, key, keep;
+    return d3.csv.parseRows(content, function(line) {
+        //  returning null from this function strips the row from the result
+
+    	if (line == null || line === undefined || line.length <= 1) return null;
+        //console.log(JSON.stringify(line));
+
+        if (params.filter) {
+            keep = params.filter(line);
+            if (!keep) return null;
+        }
+
+        // default values
+        x = 0;
+        y = 0;
+        key = "all";
+
+        // read X
+        if (params.x >= 0) {
+            if (params.xType === 'date') {
+                // parse X as a date
+                d = line[params.x].split('-');
+                if (d[0] === "") return null;
+                x = new Date(
+                	+d[0], // year (no default value)
+                	(d[1] === undefined ? 1 : +d[1])-1, // month (default: january)
+                	(d[2] === undefined ? 1 : +d[2]) // day (default: 1st)
+                ).getTime();
+            } else {
+                x = (params.xType === 'int') ? +line[params.x] : line[params.x];
+            }
+        }
+
+        // read Y
+        if (params.y >= 0) {
+            y = +line[params.y];
+            if (isNaN(y)) return null;
+        }
+
+        // read key
+        if (params.key >= 0) {
+            key = line[params.key];
+            if (key === undefined || key === null) key = "-";
+        } else {
+            key = '(' + String.fromCharCode(parseContext.urlKey) + ')';
+        }
+
+        // generate parsed entry
+    	p = { 'x':x, 'key':key, 'y':y };
+
+        // transform entry if a transform function was provided
+        return params.transform ? params.transform(p, parseContext) : p;
+    });
+};
+
+var fixData = function(data, params) {
+    // fill holes (missing Y values for every X) + order by X and KEY
+    data = assignDefaultValues(data, 0);
+
+    // collapse values with same X and KEY
+    data = collapseOverlappingY(data);
+
+    //console.log(parsed);
+
+    // sort each set by requested column
+    if (params.sort) {
+        var sorter;
+        if (params.sort === 'key' || (params.sort === 'x' && params.xType !== 'int')) {
+            sorter = function(a, b) { return (""+a[params.sort]).localeCompare(""+b[params.sort]); }
+        } else {
+            sorter = function(a,b) {
+                return a[params.sort] == b[params.sort] ? 0 : (a[params.sort] > b[params.sort] ? 1 : -1);
+            }
+        }
+        data.sort(sorter);
+    }
+
+    return data;
+};
+
+var assignDefaultValues = function(dataset, defaultValue) {
+	// get all keys
+    var k = {}, keys;
+	d3.map(dataset).forEach(function(i,d) { k[d.key] = 1; });
+	keys = d3.map(k).keys();
+
+	// initialize seen
+	var hadData = {};
+	d3.map(keys).forEach(function(i,k) { hadData[k] = true; });
+
+    var newData = [];
+    var previousRow = { x:undefined, y:undefined, key:undefined };
+    var sortByXAndKey = function(a, b) {
+        if (a.x == b.x) {
+            return a.key.localeCompare(b.key);
+        } else {
+		    return a.x == b.x ? 0 : (a.x > b.x ? 1 : -1);
+        }
+	};
+    dataset.sort(sortByXAndKey);
+
+	var loop = function(row) {
+		if (row.x !== previousRow.x) {
+            for (var i=0, l=keys.length; i<l; ++i){
+				k = keys[i];
+                if (hadData[k] === false) {
+                    newData.push({ 'key':k, 'y':defaultValue, 'x': previousRow.x });
+                }
+                hadData[k] = false;
+            }
+            previousRow = row;
+        }
+		hadData[row.key] = true;
+	};
+
+    dataset.forEach(loop);
+	loop({x:undefined});
+
+    dataset = dataset.concat(newData).sort(sortByXAndKey);
+	return dataset;
+};
+
+var collapseOverlappingY = function(data) {
+    var previous = undefined, result = [];
+    data.forEach(function(item) {
+        if (previous === undefined) {
+            previous = item;
+        } else if (previous.x === item.x && previous.key == item.key) {
+            previous.y += item.y;
+        } else {
+            result.push(previous);
+            previous = item;
+        }
+    });
+    result.push(previous);
+    return result;
+};
+
+var addChart = function(data, params, targetSelector) {
+	var piePercents = {};
+	var colors = d3.scale['category20' + params.colorSuffix]();
+	var keyColor = (params.type == 'pie' || params.type == 'donut')
+		? function(d) { 
+			if (d['data']) { piePercents[d.data.x] = (100*(d.endAngle - d.startAngle)*57.3/360).toFixed(1); }
+			return colors(d['data'] ? d.data.x : d.x); 
+		}
+		: function(d) { return colors(d.key); }
+		;
+    
+	var xFormat = params.xType == 'date'
+        ? function(d) { return d3.time.format('%Y-%m-%d')(new Date(d)); }
+        : (params.xType == 'int'
+            ? d3.format('s')
+            : function(d) { return d+""; })
+        ;
+	//var yFormat = (params.type === 'hbar' ? function(d) { return d+""} : d3.format('s'));
+	var yFormat = d3.format('s');
+
+    nv.addGraph(function() {
+		var h = document.getElementsByTagName('body')[0].clientHeight;
+		console.log("h:" + h);
+	
+		// remove previous version if any
+        d3.select(targetSelector + ' *').remove();
+
+        // data readers
+        var xReader = function(d) { return d.x };
+        var yReader = function(d) { return d.y };
+
+		// create chart for requested type
+        var chart;
+        if (params.type == 'hbar') {
+            chart = nv.models.multiBarHorizontalChart();
+            chart.margin({top: 30, right: 70, bottom: 20, left: 100});
+            chart.stacked(true);
+        } else if (params.type == 'donut' || params.type == 'pie') {
+            chart = nv.models.pieChart();
+            chart.values(function(d) { return d });
+            chart.showLabels(true).labelThreshold(0);
+            if (params.type == 'donut') chart.donut(true);
+            //if (params.x < 0) xReader = function(d) { return d.key; };
+			chart.tooltipContent(function(key, y, e) {
+				return "<h3>" + key + "</h3><p>" + y + " (" + piePercents[key] + "%)</p>";
+			});
+			
+        } else if (params.type == 'bar') {
+			chart = nv.models.multiBarChart().stacked(true);
+        } else if (params.type == 'line') {
+			chart = nv.models.lineWithFocusChart();
+			chart.x2Axis.tickFormat(xFormat);
+			chart.y2Axis.tickFormat(yFormat);
+        } else if (params.type == 'cline') {
+			chart = nv.models.cumulativeLineChart();
+        } else if (params.type == 'scatter') {
+            chart = nv.models.scatterChart().showDistX(true).showDistY(true);
+        } else if (params.type == 'double') {
+			data[0]['bar'] = true;
+			chart = nv.models.linePlusBarChart();
+			chart.y1Axis.tickFormat(yFormat);
+			chart.y2Axis.tickFormat(yFormat);
+        } else { // if (params.type == 'stream')
+			chart = nv.models.stackedAreaChart();
+        }
+
+		// set how to read data + colors
+        chart = chart
+			.x(xReader) // x
+			.y(yReader) // y
+			.color(keyColor)
+            ;
+
+		// set X and Y axis format
+        if (chart.xAxis) chart.xAxis.tickFormat(xFormat);
+        if (chart.yAxis) chart.yAxis.tickFormat(yFormat);
+
+		// add to page and inject data
+        d3.select(targetSelector)
+                .append('svg:svg')
+                .datum(data)
+                .transition().duration(300)
+                .call(chart);
+
+        nv.utils.windowResize(chart.update);
+        chart.dispatch.on('stateChange', function(e) { nv.log('state:', JSON.stringify(e['style'])); });
+
+        return chart;
+    });
+};
+
+var parseHashParams = function() {
+	// parse keyValue pairs
+    var hashParams = {};
+    var kv,
+        plus = /\+/g,  // Regex for replacing addition symbol with a space
+        keyValueRE = /([^&;=]+)=?([^&;]*)/g,
+        decode = function (s) { return decodeURIComponent(s.replace(plus, " ")); },
+        //fragment = window.location.hash.substring(1)
+        fragment = window.location.href.substring(window.location.href.lastIndexOf('#')+1)
+        ;
+    console.log(fragment);
+    while (kv = keyValueRE.exec(fragment))
+		hashParams[decode(kv[1])] = decode(kv[2]);
+	return hashParams;
+};
+
+var fixParam = function(params, name, defaultValue, doEval) {
+    if (params[name] === undefined) {
+        params[name] = defaultValue;
+    } else if (params[name] === 'null') {
+        params[name] = null;
+    } else if (doEval) {
+        try {
+            eval("params[name] = " + params[name] + ";");
+        } catch (e) {
+            console.log("error while eval for '" + name + "' : " + e);
+            params[name] = undefined;
+        }
+    }
+};
+
+var snap = function(x, step) {
+    return Math.ceil(x/step)*step;
+};
+
+var redraw = function() {
+	var params = parseHashParams();
+
+	if (params['url'] === undefined) {
+		d3.select('#chart').html('<div>ERROR : missing param "url"</div>');
+		return false;
+	}
+
+    fixParam(params, 'type', 'stream');
+    fixParam(params, 'xType', 'date');
+    fixParam(params, 'colorSuffix', '');
+    fixParam(params, 'sort', undefined);
+    fixParam(params, 'x', -1);
+    fixParam(params, 'y', -1);
+    fixParam(params, 'key', -1);
+    fixParam(params, 'transform', undefined, true);
+    fixParam(params, 'filter', undefined, true);
+
+    d3.map(params).forEach(function(key, value) {
+        console.log("params:" + key + "=" + value);
+    });
+
+    // shift tooltip to the left for HBAR
+    if (params.type == 'hbar') {
+        var style = document.createElement("style");
+        var css = document.createTextNode(
+                ".nvtooltip { transform:translateX(-100px); -webkit-transform:translateX(-100px); }"
+        );
+        style.appendChild(css);
+        document.querySelector("html > head").appendChild(style);
+    }
+
+	getData(params, function(data) {
+		var t = params.type;
+		var size = (t == 'pie' || t == 'donut') ? data[0].length : data[0].values.length;
+		//alert("data size : " + size);
+		if (size > 250) {
+			d3.select('#chart').html('<div>ERROR : Wow. Much Data. Use filter. (' + size + ' items)</div>');
+		} else {
+			addChart(data, params, '#chart');
+		}
+	});
+
+    return false;
+};
+//window.onhashchange = redraw;
+redraw();
+
+</script>
+</body>
+</html>

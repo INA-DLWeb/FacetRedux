@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project
+        xmlns="http://maven.apache.org/POM/4.0.0"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>fr.ina.dlweb</groupId>
+        <artifactId>dlweb-maven-parent</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>proprioception-web</artifactId>
+    <version>0.2-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>Proprioception Server</name>
+    <description>Little Web server with proprioception interface and job watcher</description>
+    <url>http://atelier-dlweb.fr/robot</url>
+
+    <properties>
+        <!--<hadoop.build.type>runtime</hadoop.build.type>-->
+        <hadoop.build.type>compile</hadoop.build.type>
+    </properties>
+
+    <licenses>
+        <license>
+            <name>Artistic License, Version 1.0</name>
+            <url>http://www.opensource.org/licenses/artistic-license-1.0</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>david rapin</name>
+            <email>drapin@ina.fr</email>
+        </developer>
+    </developers>
+
+    <scm>
+        <url>https://extradev.ina.fr:4443/svn/dlweb/java/proprioception-web</url>
+        <connection>scm:svn:https://extradev.ina.fr:4443/svn/dlweb/java/proprioception-web</connection>
+        <developerConnection>scm:svn:https://extradev.ina.fr:4443/svn/dlweb/java/proprioception-web
+        </developerConnection>
+        <tag>HEAD</tag>
+    </scm>
+
+    <repositories>
+        <!-- for ina artifacts -->
+        <repository>
+            <id>sonatype-nexus-snapshots</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+        </repository>
+
+        <!-- for Cloudera CDH artifacts -->
+        <repository>
+            <id>cdh.repo</id>
+            <url>https://repository.cloudera.com/artifactory/cloudera-repos</url>
+            <name>Cloudera Repo.</name>
+            <!--<snapshots><enabled>false</enabled></snapshots>-->
+        </repository>
+    </repositories>
+
+    <dependencies>
+
+        <dependency>
+        	<groupId>de.l3s.boilerpipe</groupId>
+        	<artifactId>boilerpipe</artifactId>
+        	<version>1.1.0</version>
+        </dependency>
+
+        <!-- JSON persistence -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>2.1.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>2.1.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.1.1</version>
+        </dependency>
+
+        <!-- for org.apache.tools.bzip2.CBZip2OutputStream -->
+        <dependency>
+            <groupId>ant</groupId>
+            <artifactId>ant</artifactId>
+            <version>1.6.5</version>
+        </dependency>
+        <!-- for org.antlr.runtime.tree.Tree -->
+        <dependency>
+            <groupId>org.antlr</groupId>
+            <artifactId>antlr-runtime</artifactId>
+            <version>3.5</version>
+        </dependency>
+
+        <!-- Hadoop+Pig API (1.0: Hadoop 0.2, 2.0: CHD4) -->
+        <dependency>
+            <groupId>fr.ina.dlweb</groupId>
+            <artifactId>hadoop-tools</artifactId>
+            <version>2.1-SNAPSHOT</version>
+            <scope>${hadoop.build.type}</scope>
+        </dependency>
+
+        <!-- Web server -->
+        <dependency>
+            <groupId>org.mortbay.jetty</groupId>
+            <artifactId>jetty</artifactId>
+            <version>7.0.0.pre5</version>
+        </dependency>
+
+        <!-- http client -->
+        <dependency>
+            <groupId>fr.ina.dlweb</groupId>
+            <artifactId>tapeworm-core</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- logs -->
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+            <version>1.2.17</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>javax.mail</groupId>
+                    <artifactId>mail</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+            <version>1.6.6</version>
+        </dependency>
+
+        <!-- HTML templates -->
+        <dependency>
+            <groupId>org.freemarker</groupId>
+            <artifactId>freemarker</artifactId>
+            <version>2.3.20</version>
+        </dependency>
+
+        <!-- IO and streaming utils -->
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.4</version>
+        </dependency>
+
+        <!-- MRUnit to test mapreduce jobs -->
+        <dependency>
+            <groupId>org.apache.mrunit</groupId>
+            <artifactId>mrunit</artifactId>
+            <version>1.0.0</version>
+            <scope>test</scope>
+            <classifier>hadoop2</classifier>
+        </dependency>
+
+        <!-- h2 database -->
+        <!--<dependency>-->
+            <!--<groupId>com.h2database</groupId>-->
+            <!--<artifactId>h2</artifactId>-->
+            <!--<version>1.3.174</version>-->
+            <!--<scope>${hadoop.build.type}</scope>-->
+        <!--</dependency>-->
+
+        <!-- -->
+        <dependency>
+            <groupId>org.apache.hive</groupId>
+            <artifactId>hive-jdbc</artifactId>
+            <version>0.10.0-cdh4.5.0</version>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>2.2-beta-5</version>
+                <configuration>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                    <archive>
+                        <manifest>
+                            <mainClass>fr.ina.dlweb.proprioception.web.ProprioceptionServer</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

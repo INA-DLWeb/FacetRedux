@@ -1,0 +1,2 @@
+<#if html?? && html><pre></#if><#if results??><#list results as r>${r}
+</#list><#else>failure:${error}</#if><#if html?? && html></pre></#if>

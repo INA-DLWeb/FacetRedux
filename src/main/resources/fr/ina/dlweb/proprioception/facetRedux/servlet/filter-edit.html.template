@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Filter Builder</title>
+<meta charset="utf-8" />
+<style type="text/css">
+	.and, .or, .add, .delete, .operator, .type, .value, .groupTitle { display:inline-block; }
+	.and, .or, .add, .delete {
+		border:1px solid red;
+		padding:0px 5px;
+		margin-left:10px;
+		cursor:pointer;
+	}
+	input, select { background-color:#fff !important; }
+	input         { padding:3px 0 3px 0 !important;   }
+	select        { padding:0 !important;             }
+	.operator, .type, .value {
+		padding:0 5px;
+		border:1px solid #666;
+		margin:2px 3px;
+		background-color:#ddd;
+	}
+	.type      { width:70px;  }
+	.operator  { width:55px;  }
+	.value     { width:150px; }
+	.filter    { font-family:monospaced;  }
+	.groupType { font-variant:small-caps; }
+	.groupTitle {
+		border:1px solid #ccc;
+		position:absolute;
+		top:-10px;
+		left:7px;
+		background-color:#fff;
+		padding:0 5px;
+		line-height:15px;
+		height:15px;
+	}
+	.group {
+		position:relative;
+		border:1px solid #ccc;
+		margin:13px 10px 10px 10px;
+		padding:15px 0 10px 5px;
+	}
+</style>
+<script type="text/javascript">(function(){ 
+// CONSTANTS
+var types = [
+	//<#list filters as f> 
+	'${f}', 
+	//</#list>
+];
+var operators = [
+	//<#list operators as o>
+	{'name':'${o}','symbol':'${o.symbol?html}','list':'${o.listOperator?string}'},
+	//</#list>
+];
+var operatorMap = operators.reduce(function(m,o) { m[o.name] = o; return m; }, {});
+
+// GLOBAL HELPERS
+var ready = function(f) {
+	document.addEventListener('DOMContentLoaded', function() {
+		document.removeEventListener('DOMContentLoaded', arguments.callee, false);
+		f();
+	});
+};
+var select = function(id) { return document.getElementById(id) };
+var selectAll = function(s, cb) { 
+	var a = document.querySelectorAll(s);
+	if (!cb) return a;
+	for (var i=0, l=a.length; i<l; ++i) cb(a[i],i,a);
+};
+var fragmentUrl = function () {
+    var u = document.location.href, i = u.indexOf('#');
+    return [u.substr(0, i > 0 ? i : u.length), u.substr(1+(i > 0 ? i : u.length))];
+};
+//var jlog = function(o, pretty) { console.log(JSON.stringify(o, undefined, pretty ? ' ' : '')); };
+var newForm = function(id) {
+	return '<div class="form" id="' + id + '">' + 
+	'<select size="1" id="' + id + '-type" class="type"></select>' +
+	'<select size="1" id="' + id + '-operator" class="operator"></select>' +
+	'<input type="text" id="' + id + '-value" class="value" />' +
+	'<span class="add" data-group-id="' + id + '">+</span>' +
+	'<span class="and" data-group-id="' + id + '">and</span>' +
+	'<span class="or" data-group-id="' + id + '">or</span>' +
+	(id === 'r' ? '' : '<span class="delete" data-group-id="' + id + '">-</span>') +
+	'</div>';
+};
+
+// ON DOM READY
+ready(function() {	
+	var rootGroup = {type:'and', filters:[]};
+	var frag = fragmentUrl()[1];
+	if (frag) rootGroup = JSON.parse(decodeURIComponent(frag));
+	
+	var groupAdd = function(gid, filter) {
+		var g = rootGroup;
+		gid.split("-").slice(1).forEach(function(i) { g = g.filters[i]; });
+		g.filters.push(filter);
+	};
+	
+	var groupDelete = function(gid, index) {
+		var g = rootGroup;
+		var deleteIndex = index;
+		gid.split("-").slice(1).forEach(function(i,k,a) { 
+			if (k === a.length-1) {
+				if (index === null) {
+					// delete whole group
+					deleteIndex = i;
+				} else {
+					// delete simple filter
+					g = g.filters[i];
+					deleteIndex = index;
+				}
+				return;
+			}
+			g = g.filters[i];
+		});
+		
+		if (deleteIndex !== null) {
+			g.filters.splice(deleteIndex, 1);
+		} else console.info("will not delete root group");
+	};
+	
+	var paintGroup = function(group, gid) {
+		var gt = function(c) { return '<div class="groupType '+(c?c:'')+'">' + group.type + '</div>'; };
+		return '<div class="group">' + gt('groupTitle') + group.filters.reduce(function(r,c,i,a) {
+			return r + (c.filters 
+				? paintGroup(c, gid + '-' + i)
+				: ('<div class="filter">' + 
+				'<span class="type">' + c.type + '</span>' +
+				'<span class="operator">' + operatorMap[c.operator].symbol + '</span>' + 
+				'<span class="value">' + c.value + '</span>' +
+				'<span class="delete" data-group-index="' + i + '" data-group-id="' + gid + '">-</span>' +
+				'</div>')
+			) + gt(); // (i < a.length - 1 ? group.type : '');
+		}, '') + newForm(gid) + '</div>';
+	};
+	
+	var paintGroups = function() {
+		// update url
+		document.location.href = fragmentUrl()[0] + '#' + decodeURIComponent(JSON.stringify(rootGroup));
+		// paint page
+		select('filters').innerHTML = paintGroup(rootGroup, "r");
+		
+		// delete buttons
+		var d = selectAll('.delete', function(e) {
+			e.addEventListener('click', function() {
+				var gid = this.getAttribute('data-group-id');
+				var index = this.getAttribute('data-group-index');
+				groupDelete(gid, index);
+				paintGroups();
+			});
+		});
+		
+		// add buttons
+		selectAll('.add', function(e) {
+			var gid = e.getAttribute('data-group-id');
+			e.addEventListener('click', function() {
+				var filter = {
+					type:select(gid + '-type').value,
+					operator:select(gid + '-operator').value,
+					value:select(gid + '-value').value
+				};
+				groupAdd(gid, filter);
+				paintGroups();
+			});
+		});
+		
+		// and/or buttons
+		selectAll('.and, .or', function(e) {
+			e.addEventListener('click', function() {
+				var type = this.className;
+				var gid = this.getAttribute('data-group-id');
+				var filter = {
+					type:select(gid + '-type').value,
+					operator:select(gid + '-operator').value,
+					value:select(gid + '-value').value
+				};
+				groupAdd(gid, {type:type, filters:[]});
+				paintGroups();
+			});
+		});
+		
+		// form contents
+		var ht = types.reduce(function(r, e) { return r + '<option>' + e + '</option>'; }, '');
+		selectAll('select.type', function(e) { e.innerHTML = ht });
+		
+		var ho = operators.reduce(function(r, e) { 
+			return r + '<option value="' + e.name + '">' + e.symbol + '</option>'; }
+		, '');
+		selectAll('select.operator', function(e) { e.innerHTML = ho });
+	};
+	paintGroups();
+}); 
+
+})();</script>
+</head>
+<body><div id="filters"></div></body>
+</html>

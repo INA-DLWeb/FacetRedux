@@ -1,0 +1,230 @@
+﻿<!DOCTYPE html>
+<html><!-- advanced -->
+<head>
+<meta charset="utf-8" />
+<link rel="shortcut icon" type="image/x-icon" href="./favicon.ico" />
+<title id="title">Charts</title>
+<style type="text/css">
+/*::root {
+  var-menu-height: 50px;
+}*/
+
+body {
+	font-family:verdana,sans-serif;
+	font-size:12px;
+}
+
+body,body,form {
+	margin:0;
+	padding:0;
+}
+div.root {
+	position:fixed;
+	height:calc(100% - 0px);
+	width:calc(100% - 0px);
+	margin:0;
+	padding:0;
+    min-width:840px;
+}
+div.top {
+	padding:10px;
+	height:170px;
+	border-bottom:1px solid #aaa;
+}
+div.content {
+	height:calc(100% - (170px + 22px));
+	border-bottom:1px solid #aaa;
+}
+div.content > iframe {
+	display:block;
+	height:100%;
+}
+input,select,textarea {
+	border:1px solid black;
+}
+
+select#inputType { position:absolute; top:0; left:0; }
+input#url { width:761px; margin-bottom:3px; position:relative; left:45px; }
+textarea#sql { width:761px; height:55px; margin:0; position:relative; left:45px; margin-bottom:3px; }
+
+input[type=number] { width:35px; }
+input#desc { width:274px; }
+label[for=transform] { display:block; float:left; width:405px;}
+textarea#transform,textarea#filter { width:400px; height:50px; }
+
+a#update { font-size:20px; }
+
+div#help {
+	font-family:monospace;
+	bottom:0;
+	width:calc(100% - 20px);
+	position:absolute;
+	background-color:#eee;
+	font-weight:bold;
+	text-align:center;
+	display:none;
+}
+table {
+	width:100%;
+}
+table tr td, table tr th {
+	border-left:1px solid black;
+}
+
+a#tooltip { display:inline-block; background-color:#fff; font-size:12px; float:right; position:relative; top:5px; }
+
+</style>
+<script src="./facetChart.js" type="text/javascript"></script>
+<script type="text/javascript">(function(){
+
+var keys = {
+	'inputType': { doEval: false, defaultValue: "sql" },
+	'sql'      : { doEval: false, defaultValue: "select status, month, site, content, tld, size, level, meta_count, url_count, sha_count, meta_size, real_size from facetRedux.facets_2013p where status='ok' AND month!='*' AND site='*' AND content='*' AND tld='*' AND size='*' AND level='*'" },
+	'url'      : { doEval: false, defaultValue: "/ext/gebeil_counts_reduced.csv" },
+	'type'     : { doEval: false, defaultValue: 'CSV' },
+	'x'        : { doEval: false, defaultValue: "1" }, 
+	'y'        : { doEval: false, defaultValue: "3" }, 
+	'key'      : { doEval: false, defaultValue: "2" }, 
+	'xType'    : { doEval: false, defaultValue: "date" }, 
+	'sort'     : { doEval: false, defaultValue: "x" }, 
+	'transform': { doEval: false, defaultValue: null },
+	'filter'   : { doEval: false, defaultValue: null },
+	'desc'     : { doEval: false, defaultValue: "chart title" }
+};
+
+var chart = new FacetChart(document, 'chart', keys, keys);
+
+var updateChart = function() {
+	var chartData = chart.readForm();
+	
+	var iframeData = JSON.parse(JSON.stringify(chartData));
+	if (iframeData.inputType == 'sql') {
+		iframeData.url = "/facet/data.csv?sql=" + encodeURIComponent(iframeData.sql);
+	}
+	
+    chart.updateIframe('iframe', chartData, iframeData);
+};
+var updateInput = function() {
+    var type = document.getElementById('inputType').value;
+    if (type == 'sql') {
+        document.getElementById('url').style.display = 'none';
+        document.getElementById('sql').style.display = 'inline';
+    } else {
+        document.getElementById('url').style.display = 'inline';
+        document.getElementById('sql').style.display = 'none';
+    }
+};
+window.onload = function() {
+	var d = document;
+
+    // listen to changes on the input-type select
+	d.getElementById('inputType').addEventListener('change', updateInput);
+
+    // show help when in SQL field
+    var sql = d.getElementById('sql');
+    sql.addEventListener('focus', function() {
+		d.getElementById('help').style.display = 'block';
+	});
+	sql.addEventListener('blur', function() {
+		d.getElementById('help').style.display = 'none';
+	});
+
+    // listen to clicks on update button
+    d.getElementById('update').addEventListener('click', updateChart);
+
+	var data = chart.readUrlFragment();
+	chart.updateForm(data);
+    updateInput();
+	updateChart();
+};
+
+})();</script>
+
+</head>
+<body>
+<div class="root">
+<div class="top">
+
+<form id="chart">
+
+<div style="position:relative">
+<select id="inputType" size="1">
+    <option>sql</option>
+    <option>url</option>
+</select>
+<input id="url" type="text" />
+<textarea id="sql"></textarea>
+</div>
+
+<label for="type">type:</label>
+<select id="type" size="1">
+ <option>stream</option>
+ <option>hbar</option>
+ <option>bar</option>
+ <option>pie</option>
+ <option>donut</option>
+ <option>line</option>
+ <option>cline</option>
+ <option>scatter</option>
+ <option>double</option>
+ <option>CSV</option>
+</select>
+
+<label for="x">x:</label>
+<input id="x" type="number" />
+
+<label for="xType">x type:</label>
+<select id="xType" size="1">
+<option>string</option>
+<option>int</option>
+<option>date</option>
+</select>
+
+<label for="y">y:</label>
+<input id="y" type="number" />
+
+<label for="key">key:</label>
+<input id="key" type="number" />
+
+<label for="sort">sort:</label>
+<select id="sort" size="1">
+<option>none</option>
+<option>x</option>
+<option>y</option>
+<option>key</option>
+</select>
+
+<label for="desc">title:</label>
+<input type="text" id="desc" />
+
+<br/>
+<label for="transform">Transform:</label><label for="filter">Filter:</label>
+<br/>
+<textarea id="transform" ></textarea>
+<textarea id="filter" ></textarea>
+<br/>
+<a id="update" href="javascript:void(0);">update</a> 
+<a id="tooltip" href="./easy2000.html">simple query</a>
+</form>
+
+</div>
+<div class="content">
+ <iframe id="iframe" width="100%" src="" frameborder="0" allowtransparency="true"></iframe>
+</div>
+
+</div>
+
+<div id="help">
+<table>
+<tr><th>status</th><th>month</th><th>site</th><th>content</th><th>tld</th><th>size</th><th>level</th></tr>
+<tr><td>'ok'</td><td>'2010-05'</td><td>'france2.fr'</td><td>'HTML'</td><td>'com'</td><td>'10K-100K'</td><td>'1'</td></tr>
+</table>
+<hr/>
+<table>
+<tr><th>meta_count</th><th>url_count</th><th>sha_count</th><th>meta_size</th><th>real_size</th></tr>
+<tr><td>metadata count</td><td>distinct URLs</td><td>distinct SHAs</td><td>sum of metadata sizes</td><td>sum of distinct SHA sizes</td></tr>
+</table>
+</div>
+
+</body>
+</html>

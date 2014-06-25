@@ -1,0 +1,2 @@
+<#if result.results??><#list result.results as r>${r}
+</#list><#else>failure</#if>
