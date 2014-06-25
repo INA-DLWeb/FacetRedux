@@ -83,7 +83,7 @@ Considering the amount of records that are created every year in our archive (ap
 
 The pre-computed backing data for our system is produced using the [Hadoop](http://hadoop.apache.org/) [MapReduce](http://en.wikipedia.org/wiki/MapReduce) framework. This framework enables us to scale the pre-computing process by splitting it into multiple small tasks and distributing these tasks across computers in a cluster.
 
-Using MapReduce, we use the metadata as input to the Mapper to generate _two_ outputs for each metadata record. The ouput **key** contains a **prefix** (the *criteria* for the record) and a **suffix** (containing the _URL `MD5` in the first output_ or _the content `SHA256` in the second output_). The **value** contains the content size.
+Using MapReduce, we use the metadata as input to the [Mapper](./src/main/java/fr/ina/dlweb/proprioception/facetRedux/job/FacetReduxMapper.java#L71) to generate _two_ outputs for each metadata record. The ouput **key** contains a **prefix** (the *criteria* for the record) and a **suffix** (containing the _URL `MD5` in the first output_ or _the content `SHA256` in the second output_). The **value** contains the content size.
 ```javascript
 // Mapper output
 KEY: {
@@ -95,7 +95,7 @@ KEY: {
 VALUE: [ '[size]' ]
 ```
 
-The Reducer sorts the records by *key prefix* and *key suffix*. The records with the same *key prefix* are grouped, the key suffix is used to count **unique URLS** (using URL [MD5](http://en.wikipedia.org/wiki/MD5) signatures), **unique contents** (using content SHA256 signatures) and compute the **deduplicated size** (summing the size of unique contents). The Reducer generates _one input per unique key prefix_, the value of the output 
+The [Reducer](./src/main/java/fr/ina/dlweb/proprioception/facetRedux/job/FacetReduxReducer.java#L71) sorts the records by *key prefix* and *key suffix*. The records with the same *key prefix* are grouped, the key suffix is used to count **unique URLS** (using URL [MD5](http://en.wikipedia.org/wiki/MD5) signatures), **unique contents** (using content SHA256 signatures) and compute the **deduplicated size** (summing the size of unique contents). The Reducer generates _one input per unique key prefix_, the value of the output 
 ```javascript
 // Reducer output
 KEY: [ '[status]','[month]','[siteId]','[type]','[sizeCategory]','[tld]','[depth]' ]
@@ -157,7 +157,7 @@ In this approach, we enumerate all possible combinaisons of *criteria* that can 
 ```
 
 To be able to compute such a result, the Mapper and Reducer need to be redesigned. Specifically, for each ouput in the previously described Mapper, we will generate **all** possible combinations of *criteria* in the key prefix _where a criteria matches any value_ (i.e. `ANY`). 
-To enumerate these [combinations with our 7 criteria](http://rosettacode.org/wiki/Combinations#Java), we generate what is called a [*C(n, k) for all k where `n=7`*](http://en.wikipedia.org/wiki/Combination#Number_of_k-combinations_for_all_k). To limit the number of possible combinations and improve scalability, we have decided to exclude the first *criteria* (`response status`) from the combinations. Thus, for each metadata entry, the Mapper will generate the *C(6, k) for all k* key combinations (64 combinations) of all *criteria*.
+To enumerate these [combinations with our 7 criteria](http://rosettacode.org/wiki/Combinations#Java), we generate what is called a [*C(n, k) for all k where `n=7`*](http://en.wikipedia.org/wiki/Combination#Number_of_k-combinations_for_all_k). To limit the number of possible combinations and improve scalability, we have decided to exclude the first *criteria* (`response status`) from the combinations. Thus, for each metadata entry, the Mapper will generate the *C(6, k) for all k* key combinations (64 combinations) of all *criteria* (see actual Java code for generating [boolean combinations](./src/main/java/fr/ina/dlweb/proprioception/facetRedux/job/FacetReduxJob.java#L117) and [key combinations](./src/main/java/fr/ina/dlweb/proprioception/facetRedux/job/FacetReduxMapper.java#L170)).
 The following array represents the 64 generated combinations, where a *criteria* is replaced by `*` when it can match any value.
 ```
 01  02  03  04  05  06  07  08  09  10  11  12  13  14  15  16  17  18  19  20  21  22  23  24  25  26  27  28  29  30  31  32  33  34  35  36  37  38  39  40  41  42  43  44  45  46  47  48  49  50  51  52  53  54  55  56  57  58  59  60  61  62  63  64  
